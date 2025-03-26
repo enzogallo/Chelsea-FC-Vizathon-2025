@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from io import BytesIO
 from fpdf import FPDF
+import tempfile
 
 # ✅ Page configuration (must be first Streamlit command)
 st.set_page_config(page_title="Chelsea FC Vizathon Dashboard", layout="wide")
@@ -80,6 +81,70 @@ if not gps_data.empty and not recovery_data.empty:
 else:
     readiness_df = pd.DataFrame()
 
+# --- PDF Generation ---
+def generate_global_report(start_date, end_date):
+    fig, ax = plt.subplots(figsize=(6, 4))
+    pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+    pitch.draw(ax=ax)
+    sample = position_data.sample(100)
+    pitch.kdeplot(sample.x, sample.y, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
+
+    # ✅ Save heatmap to temporary file
+    tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    fig.savefig(tmp_img.name, format="png")
+    plt.close(fig)
+
+    # ✅ Generate PDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', size=14)
+    pdf.cell(200, 10, txt="Chelsea FC - Team Performance Report", ln=True, align="C")
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt=f"Period: {start_date} to {end_date}", ln=True, align="C")
+    pdf.ln(10)
+
+    if not readiness_df.empty:
+        filtered = readiness_df[
+            (readiness_df["date"] >= pd.to_datetime(start_date)) & 
+            (readiness_df["date"] <= pd.to_datetime(end_date))
+        ]
+        score = filtered["readiness_score"].mean()
+        pdf.cell(200, 10, txt=f"Average Readiness Score: {score:.1f}%", ln=True)
+
+    pdf.image(tmp_img.name, x=30, y=60, w=150)
+
+    # ✅ Return PDF content as bytes
+    return pdf.output(dest='S').encode('latin1')
+
+
+def generate_player_report(player_id):
+    player_df = position_data[position_data["player_id"] == player_id]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+    pitch.draw(ax=ax)
+    pitch.kdeplot(player_df.x, player_df.y, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
+
+    # ✅ Save image to temp file
+    tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    fig.savefig(tmp_img.name, format="png")
+    plt.close(fig)
+
+    # ✅ Create PDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', size=14)
+    pdf.cell(200, 10, txt=f"Chelsea FC - Player #{player_id} Report", ln=True, align="C")
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt=f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True, align="C")
+    pdf.ln(10)
+    pdf.cell(200, 10, txt="Player Movement Heatmap", ln=True)
+
+    pdf.image(tmp_img.name, x=30, y=60, w=150)
+
+    # ✅ Return as bytes
+    return pdf.output(dest='S').encode('latin1')
+
 # --- Tabs ---
 tabs = st.tabs(["Squad Overview", "Load Demand", "Injury", "Physical Development", "Biography", "Recovery", "External Factors", "Position Heatmap"])
 
@@ -107,7 +172,12 @@ with tabs[0]:
 
         if st.button("📥 Download Team PDF Report"):
             report = generate_global_report(start_date, end_date)
-            st.download_button("Download Team Report", data=report, file_name="team_report.pdf")
+            st.download_button(
+                "Download Team Report",
+                data=report,
+                file_name="team_performance_report.pdf",
+                mime="application/pdf"
+            )
     else:
         st.info("No readiness data available.")
 
@@ -223,8 +293,12 @@ with tabs[7]:
         st.pyplot(fig)
 
         if st.button("📥 Download Player PDF Report"):
-            player_pdf = generate_player_report(selected_player)
-            st.download_button("Download Player Report", data=player_pdf, file_name=f"player_{selected_player}_report.pdf")
+            st.download_button(
+                "Download Player Report",
+                data=generate_player_report(selected_player),
+                file_name=f"player_{selected_player}_report.pdf",
+                mime="application/pdf"
+            )
     else:
         st.info("No position data available.")
 
