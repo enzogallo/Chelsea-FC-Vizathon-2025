@@ -1,7 +1,3 @@
-Voici une version améliorée et plus claire de ton fichier :  
-
----
-
 # **Chelsea FC Vizathon - Performance Visualization Dashboard**  
 
 ## **📌 Project Description**  
