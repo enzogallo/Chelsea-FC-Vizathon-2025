@@ -1,92 +1,189 @@
-/* ================================
-   Modernisation du CSS pour le Vizathon Chelsea FC Dashboard
-   ================================ */
-
-/* Corps de la page */
+/** === Global Styles === */
 body {
-    background-color: #eef2f3;
     font-family: 'Poppins', sans-serif;
-    color: #222;
-    margin: 0;
+    background-color: #f4f6f9;
+    color: #1c1c1c;
+}
+
+/** === Headers === */
+h1, h2, h3, h4 {
+    font-weight: 600;
+    color: #034694;
+}
+
+/** === Metric Cards === */
+.metric-card {
+    background-color: white;
+    padding: 1.2rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+    margin-bottom: 1rem;
+}
+
+/** === Buttons === */
+button {
+    background-color: #034694 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 0.6rem 1.2rem !important;
+    font-weight: 600;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.2s ease;
+}
+button:hover {
+    background-color: #022e6c !important;
+}
+
+button[kind="secondary"] {
+    background: white !important;
+    color: #034694 !important;
+    font-weight: 600;
+    border: 2px solid #034694 !important;
+    padding: 1.2rem 1rem !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+}
+button[kind="secondary"]:hover {
+    background-color: #034694 !important;
+    color: white !important;
+}
+
+.card-wrapper:hover {
+    opacity: 0.95;
+    transform: scale(1.02);
+    transition: all 0.2s ease-in-out;
+}
+
+.card-container {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+    background-color: white;
+    margin-bottom: 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 420px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    cursor: pointer;
     padding: 0;
 }
 
-/* Sidebar améliorée */
-[data-testid="stSidebar"] {
-    background-color: #002f6c; /* Bleu Chelsea */
-    color: #ffffff;
+.card-container:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.2);
 }
 
-/* Titres principaux */
-h1, h2, h3, h4, h5, h6 {
-    color: #002f6c;
-    font-weight: 700;
-}
-
-/* Personnalisation des métriques */
-[data-testid="stMetricValue"] {
-    font-size: 2.8em;
-    font-weight: bold;
-    color: #e63946; /* Rouge alerte */
-}
-
-/* Graphiques Plotly */
-.plotly-graph-div {
+.card-button {
     border: none;
-    border-radius: 12px;
-    background-color: #ffffff;
-    box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.15);
-    padding: 15px;
-    margin-bottom: 25px;
-}
-
-/* Conteneurs et marges */
-.css-18e3th9 {
-    padding: 1.5rem;
-}
-
-/* Boutons personnalisés */
-button {
-    background-color: #ff7f50;
-    color: #fff;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-button:hover {
-    background-color: #e63946;
-    transform: scale(1.05);
-}
-
-/* Cartes et sections */
-.card {
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    margin-bottom: 20px;
-}
-
-/* Tableaux */
-table {
-    border-collapse: collapse;
+    background: none;
+    padding: 0;
     width: 100%;
-    border-radius: 8px;
-    overflow: hidden;
+    height: 100%;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: center;
 }
 
-th, td {
-    padding: 12px 15px;
-    border: 1px solid #ddd;
-    text-align: left;
+
+.card-container:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.2);
 }
 
-th {
-    background-color: #002f6c;
-    color: #fff;
-    font-weight: bold;
+.card-button:focus {
+    outline: none;
+}
+
+.card-image {
+    height: 350px;
+    object-fit: cover;
+    width: 100%;
+    border-radius: 0;
+    display: block;
+}
+
+.card-label {
+    text-align: center;
+    font-weight: 600;
+    padding: 0.8rem 0;
+    font-size: 0.95rem;
+    color: #034694;
+    background: #f9f9f9;
+    width: 100%;
+}
+
+/** === Hide default Streamlit button bubbles === */
+button[data-testid="stButton"] {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    height: 0;
+    width: 0;
+    opacity: 0;
+    position: absolute;
+    pointer-events: none;
+}
+
+/** === Sidebar === */
+.css-1d391kg, .css-1d1hsi1 {
+    background-color: #034694 !important;
+    color: white !important;
+}
+
+/** === Section Containers === */
+.section-container {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+/** === Inputs & Select === */
+input, select, textarea {
+    border-radius: 6px;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+}
+
+/** === Tables === */
+.css-1r6slb0 td {
+    padding: 0.75rem 1rem;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e6e6e6;
+}
+
+/** === Graph Section Titles === */
+.graph-title {
+    font-size: 1.3rem;
+    margin-top: 1.5rem;
+    color: #1c1c1c;
+}
+
+/** === Heatmap container === */
+.heatmap-section {
+    background-color: #ffffff;
+    padding: 1rem;
+    border-radius: 1rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    margin-top: 1rem;
+    margin-bottom: 2rem;
+}
+
+/** === Page Background === */
+main > div {
+    padding: 2rem 2.5rem;
+    background-color: #f0f2f5;
+    border-radius: 10px;
+}
+
+.card-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    height: 100%;
 }

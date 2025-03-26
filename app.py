@@ -3,326 +3,553 @@ import pandas as pd
 import plotly.express as px
 import os
 import numpy as np
+from datetime import datetime, timedelta
 from mplsoccer import Pitch
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
 from io import BytesIO
 from fpdf import FPDF
 import tempfile
+import cv2
+import easyocr
+import base64
+import urllib.parse
 
-# ✅ Page configuration (must be first Streamlit command)
+# ----------------------------
+# CONFIGURATION & SETUP
+# ----------------------------
 st.set_page_config(page_title="Chelsea FC Vizathon Dashboard", layout="wide")
 
-# --- Inject custom CSS ---
+params = st.query_params
+if "tab" in params:
+    st.session_state.active_tab = params["tab"] if isinstance(params["tab"], str) else params["tab"][0]
+
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "Home"
+
+def render_home():
+    st.markdown("## 📊 Dashboard Modules")
+    cols = st.columns(3)
+
+    cards = [
+        {"label": "Squad Overview", "icon": "🧠", "tab": "Squad Overview"},
+        {"label": "Load Demand", "icon": "📈", "tab": "Load Demand"},
+        {"label": "Recovery", "icon": "🛌", "tab": "Recovery"},
+        {"label": "Physical Development", "icon": "🏋️", "tab": "Physical Development"},
+        {"label": "Biography", "icon": "📇", "tab": "Biography"},
+        {"label": "Injury", "icon": "❌", "tab": "Injury"},
+        {"label": "External Factors", "icon": "🌍", "tab": "External Factors"},
+        {"label": "Position Heatmap", "icon": "📍", "tab": "Position Heatmap"},
+        {"label": "Video Analysis", "icon": "🎥", "tab": "Video Analysis"},
+    ]
+
+    for i, card in enumerate(cards):
+        col = cols[i % 3]
+        with col:
+            image_path = f"images/{card['tab'].lower().replace(' ', '_')}.png"
+            if os.path.exists(image_path):
+                with open(image_path, "rb") as img_file:
+                    encoded = base64.b64encode(img_file.read()).decode()
+
+                # Affichage image
+                st.markdown(f"""
+                    <img src="data:image/png;base64,{encoded}" 
+                         style="width:100%; height:350px; object-fit:cover; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:0.5rem;" />
+                """, unsafe_allow_html=True)
+
+                # Bouton avec clé unique (ajout d'un préfixe)
+                if st.button(f"{card['icon']} {card['label']}", key=f"btn_{card['tab']}"):
+                    st.session_state.active_tab = card["tab"]
+                    st.rerun()
+
+
 def local_css(file_name):
     with open(file_name) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 local_css("styles.css")
 
-# --- Title and description ---
-st.title("Chelsea FC Vizathon Dashboard")
-st.markdown("This interactive dashboard allows coaches to monitor player performance in real time, update the data, and explore multiple modules (Load Demand, Injury, Physical Development, etc.).")
+st.markdown("""
+<div style="background-color:#034694; padding:2rem 1rem; border-radius:1rem; color:white; text-align:center; margin-bottom:2rem;">
+    <h1 style="margin:0; font-size:2.5rem;">Chelsea FC Vizathon Dashboard</h1>
+    <p style="margin-top:0.8rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
+        Designed for elite coaches: actionable insights, no data science degree required.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
-# --- Load data function ---
+# ----------------------------
+# LOAD & FORMAT DATA
+# ----------------------------
 @st.cache_data
-def load_data(file_path):
-    if os.path.exists(file_path):
-        return pd.read_csv(file_path, encoding="ISO-8859-1")
-    else:
-        return pd.DataFrame()
+def load_data(path):
+    return pd.read_csv(path, encoding="ISO-8859-1") if os.path.exists(path) else pd.DataFrame()
 
-# --- Generate sample GPS data ---
-def generate_sample_gps_coordinates():
-    data = {
-        "player_id": np.random.choice([7, 10, 22], size=300),
-        "x": np.random.normal(loc=52.5, scale=20, size=300),
-        "y": np.random.normal(loc=34, scale=15, size=300),
-        "timestamp": pd.date_range(start="2025-03-25 14:00", periods=300, freq="s")
-    }
-    return pd.DataFrame(data)
+gps_data = load_data("CFC GPS Data.csv")
+if "player_id" not in gps_data.columns:
+    gps_data["player_id"] = np.random.choice([7, 10, 22], size=len(gps_data))
+recovery_data = load_data("CFC Recovery status Data.csv")
+priority_data = load_data("CFC Individual Priority Areas.csv")
+capability_data = load_data("CFC Physical Capability Data_.csv")
+capability_data.columns = capability_data.columns.str.strip().str.lower()
 
-position_data = generate_sample_gps_coordinates()
-
-# --- File paths ---
-gps_data_path = "CFC GPS Data.csv"
-priority_data_path = "CFC Individual Priority Areas.csv"
-capability_data_path = "CFC Physical Capability Data_.csv"
-recovery_data_path = "CFC Recovery status Data.csv"
-
-# Load datasets
-gps_data = load_data(gps_data_path)
-priority_data = load_data(priority_data_path)
-capability_data = load_data(capability_data_path)
-recovery_data = load_data(recovery_data_path)
-
-# Normalize column names
+# Format columns
 if "sessionDate" in recovery_data.columns:
     recovery_data.rename(columns={"sessionDate": "date"}, inplace=True)
 if "Subjective_composite" in recovery_data.columns:
     recovery_data.rename(columns={"Subjective_composite": "recovery_score"}, inplace=True)
-
 for df in [gps_data, recovery_data, capability_data]:
     if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-# --- Readiness calculation ---
-def calculate_readiness_score(row):
+# ----------------------------
+# READINESS SCORE
+# ----------------------------
+def calculate_readiness(row):
     if 'recovery_score' in row and 'distance' in row:
-        score = 0.5 * (row['recovery_score'] / 100) + 0.5 * (1 - (row['distance'] / 10000))
-        return round(score * 100, 1)
+        return round((0.5 * (row['recovery_score'] / 100) + 0.5 * (1 - (row['distance'] / 10000))) * 100, 1)
     return np.nan
 
 if not gps_data.empty and not recovery_data.empty:
-    latest_gps = gps_data.sort_values("date").groupby("date").tail(1)
-    latest_recovery = recovery_data.sort_values("date").groupby("date").tail(1)
-    readiness_df = pd.merge(latest_gps, latest_recovery, on="date", suffixes=('_gps', '_rec'))
-    readiness_df["readiness_score"] = readiness_df.apply(calculate_readiness_score, axis=1)
+    gps_latest = gps_data.sort_values("date").groupby("date").tail(1)
+    rec_latest = recovery_data.sort_values("date").groupby("date").tail(1)
+    readiness_df = pd.merge(gps_latest, rec_latest, on="date")
+    
+    if "recovery_score" not in readiness_df.columns:
+        if "recovery_score" in rec_latest.columns:
+            readiness_df["recovery_score"] = rec_latest["recovery_score"].values
+        else:
+            fallback_cols = [col for col in rec_latest.columns if "recovery" in col.lower()]
+            if fallback_cols:
+                readiness_df["recovery_score"] = rec_latest[fallback_cols[0]].values
+
+    readiness_df["readiness_score"] = readiness_df.apply(calculate_readiness, axis=1)
+
+    def generate_player_report(player_id):
+        fig, ax = plt.subplots(figsize=(6, 4))
+        pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+        pitch.draw(ax=ax)
+        x_vals = np.random.normal(52.5, 20, 100)
+        y_vals = np.random.normal(34, 15, 100)
+        pitch.kdeplot(x_vals, y_vals, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
+        tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig.savefig(tmp_img.name)
+        plt.close(fig)
+
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(200, 10, f"Player {player_id} Heatmap Report", ln=True, align="C")
+        pdf.set_font("Arial", '', 12)
+        pdf.cell(200, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True, align="C")
+        pdf.image(tmp_img.name, x=30, y=60, w=150)
+        return pdf.output(dest="S").encode("latin1")
 else:
     readiness_df = pd.DataFrame()
 
-# --- PDF Generation ---
-def generate_global_report(start_date, end_date):
+# ----------------------------
+# PDF GENERATOR
+# ----------------------------
+def generate_pdf_report(df, title="Team Report", score=None):
     fig, ax = plt.subplots(figsize=(6, 4))
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
     pitch.draw(ax=ax)
-    sample = position_data.sample(100)
-    pitch.kdeplot(sample.x, sample.y, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
-
-    # ✅ Save heatmap to temporary file
+    pitch.kdeplot(np.random.uniform(0, 105, 100), np.random.uniform(0, 68, 100), ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
     tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig.savefig(tmp_img.name, format="png")
+    fig.savefig(tmp_img.name)
     plt.close(fig)
 
-    # ✅ Generate PDF
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', size=14)
-    pdf.cell(200, 10, txt="Chelsea FC - Team Performance Report", ln=True, align="C")
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt=f"Period: {start_date} to {end_date}", ln=True, align="C")
-    pdf.ln(10)
-
-    if not readiness_df.empty:
-        filtered = readiness_df[
-            (readiness_df["date"] >= pd.to_datetime(start_date)) & 
-            (readiness_df["date"] <= pd.to_datetime(end_date))
-        ]
-        score = filtered["readiness_score"].mean()
-        pdf.cell(200, 10, txt=f"Average Readiness Score: {score:.1f}%", ln=True)
-
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(200, 10, title, ln=True, align="C")
+    pdf.set_font("Arial", '', 12)
+    if score:
+        pdf.ln(10)
+        pdf.cell(200, 10, f"Average Readiness Score: {score:.1f}%", ln=True, align="C")
     pdf.image(tmp_img.name, x=30, y=60, w=150)
+    return pdf.output(dest="S").encode("latin1")
 
-    # ✅ Return PDF content as bytes
-    return pdf.output(dest='S').encode('latin1')
+# ----------------------------
+# NAVIGATION LOGIC
+# ----------------------------
+# Lecture du clic simulé (si un formulaire invisible est soumis)
 
+if st.session_state.active_tab == "Home":
+    render_home()
+elif st.session_state.active_tab == "Squad Overview":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
 
-def generate_player_report(player_id):
-    player_df = position_data[position_data["player_id"] == player_id]
+    st.header("🧠 Squad Readiness Overview")
+ 
+    if not readiness_df.empty:
+        st.markdown("This section gives you an overview of the team's physical availability..")
+ 
+        # Affichage des statistiques de readiness
+        readiness_summary = readiness_df.groupby("date")["readiness_score"].mean().reset_index()
+        st.line_chart(readiness_summary.rename(columns={"date": "index"}).set_index("index"))
+ 
+        # Résumé par niveau
+        low = readiness_df[readiness_df["readiness_score"] < 60].shape[0]
+        moderate = readiness_df[(readiness_df["readiness_score"] >= 60) & (readiness_df["readiness_score"] < 75)].shape[0]
+        high = readiness_df[readiness_df["readiness_score"] >= 75].shape[0]
+ 
+        st.markdown("### 🔍 Summary of readiness levels")
+        st.success(f"🟩 Number of days with high readiness : {high}")
+        st.warning(f"🟧 Number of days with moderate readiness : {moderate}")
+        st.error(f"🟥 Number of days with low readiness : {low}")
+ 
+        # Affichage des données brutes pour référence
+        with st.expander("📋 View detailed data"):
+            required_cols = ["date", "distance", "recovery_score", "readiness_score"]
+            for col in required_cols:
+                if col not in readiness_df.columns:
+                    readiness_df[col] = np.nan
+            st.dataframe(readiness_df[required_cols])
+    else:
+        st.info("No data available for the moment.")
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+elif st.session_state.active_tab == "Load Demand":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
+
+    st.header("📈 Match Load Analysis")
+    player_list = gps_data["player_id"].dropna().unique()
+    selected_player = st.selectbox("Select Player for Individual View", player_list)
+    player_data = gps_data[gps_data["player_id"] == selected_player]
+    player_data = player_data[player_data["distance"] > 0]
+
+    st.subheader("🎯 Filter by Player")
+    st.info("⚠️ Null distances have been excluded as they correspond to non-participation (players not lined up)..")
+    
+    # Distance Covered Over Time with Rolling Average
+    if "distance" in player_data.columns:
+        player_data_sorted = player_data.sort_values("date")
+        player_data_sorted["rolling_distance"] = player_data_sorted["distance"].rolling(window=7, min_periods=1).mean()
+        avg_distance = player_data_sorted["distance"].mean()
+
+        fig_distance = px.line(
+            player_data_sorted,
+            x='date',
+            y=['distance', 'rolling_distance'],
+            title=f'Distance Covered Over Time – Player {selected_player}',
+            labels={'value': 'Distance (m)', 'date': 'Date', 'variable': 'Metric'}
+        )
+        fig_distance.add_hline(y=avg_distance, line_dash="dot", annotation_text=f"Moyenne: {avg_distance:.1f} m", line_color="green")
+        st.plotly_chart(fig_distance, use_container_width=True)
+        st.caption("Tracks the player's total distance covered over time, with a rolling average to highlight physical load trends.")
+
+    # Acceleration/Deceleration per Session with Mean Line
+    accel_cols = [col for col in player_data.columns if "accel_decel" in col]
+    if accel_cols:
+        for col in accel_cols:
+            fig_accel = px.line(
+                player_data.sort_values("date"),
+                x="date",
+                y=col,
+                title=f"{col.replace('_', ' ').title()} per Session"
+            )
+            mean_val = player_data[col].mean()
+            fig_accel.add_hline(y=mean_val, line_dash="dot", line_color="orange", annotation_text=f"Moyenne: {mean_val:.1f}")
+            st.plotly_chart(fig_accel, use_container_width=True)
+            st.caption("Monitors explosive efforts through acceleration/deceleration counts, indicating session intensity.")
+
+    # Total Distance vs Peak Speed with Trendline
+    if "peak_speed" in player_data.columns:
+        fig_gps = px.scatter(
+            player_data,
+            x="distance",
+            y="peak_speed",
+            trendline="ols",
+            hover_data=["date"],
+            title="Total Distance vs Peak Speed"
+        )
+        st.plotly_chart(fig_gps, use_container_width=True)
+        st.caption("Shows correlation between total distance and peak speed — useful to assess efficiency of high-speed efforts.")
+
+    # Average Distance by Opposition with Annotations
+    if "opposition_full" in player_data.columns:
+        opposition_summary = player_data.groupby("opposition_full")["distance"].mean().reset_index()
+        fig_opposition = px.bar(
+            opposition_summary,
+            x="opposition_full",
+            y="distance",
+            title="Average Distance by Opposition"
+        )
+        avg_opp = opposition_summary["distance"].mean()
+        fig_opposition.add_hline(y=avg_opp, line_dash="dot", annotation_text=f"Moyenne: {avg_opp:.1f} m", line_color="gray")
+        st.plotly_chart(fig_opposition, use_container_width=True)
+        st.caption("Highlights the average distance covered against each opponent — helps understand match demands.")
+    
+elif st.session_state.active_tab == "Recovery":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
+
+    st.header("🛌 Recovery Overview")
+    st.subheader("📊 Daily Team Recovery Summary")
+    if "recovery_score" in recovery_data.columns:
+        daily_avg = recovery_data.groupby("date")["recovery_score"].mean().reset_index()
+        st.line_chart(daily_avg.rename(columns={"date": "index"}).set_index("index"))
+
+        latest_score = daily_avg["recovery_score"].iloc[-1]
+        if latest_score < 50:
+            st.error(f"🟥 Latest team recovery average is very low ({latest_score:.1f}%) — caution advised.")
+        elif latest_score < 70:
+            st.warning(f"🟧 Latest team recovery is moderate ({latest_score:.1f}%).")
+        else:
+            st.success(f"🟩 Team is well recovered ({latest_score:.1f}%) today.")
+    st.subheader("🕵️‍♂️ Players with Low Recovery Scores")
+    if "recovery_score" in recovery_data.columns and "player_id" in recovery_data.columns:
+        recent = recovery_data[recovery_data["date"] >= recovery_data["date"].max() - pd.Timedelta(days=3)]
+        low_scores = recent[recent["recovery_score"] < 60]
+        if not low_scores.empty:
+            st.dataframe(low_scores[["date", "player_id", "recovery_score"]].sort_values("date", ascending=False))
+        else:
+            st.success("✅ No players with critical recovery levels in the last 3 days.")
+    if not recovery_data.empty:
+        st.dataframe(recovery_data)
+        if "recovery_score" in recovery_data.columns:
+            st.plotly_chart(px.line(recovery_data, x="date", y="recovery_score", title="Recovery Score Trend"))
+        st.subheader("⚖️ Recovery vs Load (Correlation)")
+        merged = pd.merge(gps_data, recovery_data, on="date", how="inner")
+        if "recovery_score" in merged.columns and "distance" in merged.columns:
+            fig_corr = px.scatter(
+                merged,
+                x="distance",
+                y="recovery_score",
+                color="player_id" if "player_id" in merged.columns else None,
+                title="Recovery vs Distance Covered"
+            )
+            st.plotly_chart(fig_corr, use_container_width=True)
+    else:
+        st.info("No recovery data available.")
+    
+elif st.session_state.active_tab == "Physical Development":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
+
+    st.header("🏋️ Physical Test Results")
+    if not capability_data.empty:
+        st.markdown("Cette section vous permet d'évaluer les capacités physiques des joueurs par rapport à des benchmarks de référence.")
+
+        if 'movement' in capability_data.columns and 'benchmarkpct' in capability_data.columns:
+            st.subheader("📊 Comparaison aux Benchmarks")
+            fig_benchmark = px.bar(
+                capability_data,
+                x='movement',
+                y='benchmarkpct',
+                color='movement',
+                title="💪 Pourcentage de Benchmark atteint par mouvement",
+                labels={'benchmarkpct': '% du benchmark'},
+            )
+            st.plotly_chart(fig_benchmark, use_container_width=True)
+            st.caption("Shows how players perform against predefined benchmarks for each movement type, helping coaches spot top performers or areas for focus.")
+
+        if 'test name' in capability_data.columns and 'score' in capability_data.columns:
+            st.subheader("📈 Score distribution by test")
+            fig_score = px.box(
+                capability_data,
+                x='test name',
+                y='score',
+                points='all',
+                title='📦 Scores by Test',
+                labels={'score': 'score', 'test name': 'Test'}
+            )
+            st.plotly_chart(fig_score, use_container_width=True)
+            st.caption("Displays score variability per test, helping identify consistency and outliers in player assessments.")
+ 
+        st.markdown("### 📊 Performance Comparative par Mouvement")
+ 
+        if "player name" in capability_data.columns and "movement" in capability_data.columns and "benchmarkpct" in capability_data.columns:
+            fig_compare = px.box(
+                capability_data.dropna(subset=["benchmarkpct"]),
+                x="movement",
+                y="benchmarkpct",
+                points="all",
+                color="movement",
+                title="📦 Performance distribution by movement",
+                labels={"benchmarkpct": "% du benchmark atteint", "movement": "Mouvement"}
+            )
+            st.plotly_chart(fig_compare, use_container_width=True)
+            st.caption("This boxplot compares player performance across different movement types, highlighting strengths and development areas.")
+ 
+        st.markdown("### 🔍 Progress of physical tests over time")
+        if "testDate" in capability_data.columns and "benchmarkpct" in capability_data.columns:
+            try:
+                capability_data["testDate"] = pd.to_datetime(capability_data["testDate"], dayfirst=True, errors="coerce")
+                trend = (
+                    capability_data.dropna(subset=["benchmarkpct"])
+                    .groupby("testDate")["benchmarkpct"]
+                    .mean()
+                    .reset_index()
+                    .sort_values("testDate")
+                )
+                fig_trend = px.line(
+                    trend,
+                    x="testDate",
+                    y="benchmarkpct",
+                    title="📈 Evolution of Average Performance over Time",
+                    labels={"benchmarkpct": "% Benchmark", "testDate": "Date"}
+                )
+                st.plotly_chart(fig_trend, use_container_width=True)
+                st.caption("This trendline shows how average physical performance (as % of benchmark) evolves over time. Useful to monitor training effectiveness.")
+            except Exception as e:
+                st.warning("Cannot display time trend: data error.")
+ 
+        st.subheader("📋 Données Brutes")
+        st.dataframe(capability_data)
+    else:
+        st.warning("No physical development data available.")
+    
+elif st.session_state.active_tab == "Biography":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
+
+    st.header("📇 Player Profile & Individual Objectives")
+    st.markdown("This section provides an overview of the individual objectives set for players and their achievement status..")
+
+    if not priority_data.empty:
+        st.subheader("🎯 Status of Individual Objectives")
+        if "Tracking" in priority_data.columns:
+            fig_status = px.pie(priority_data, names="Tracking", title="Distribution des Objectifs", hole=0.4)
+            st.plotly_chart(fig_status, use_container_width=True)
+
+        if {"Player Name", "Individual Goals", "Tracking"}.issubset(priority_data.columns):
+            st.subheader("📋 Goals per player")
+            st.dataframe(priority_data[["Player Name", "Individual Goals", "Tracking"]])
+        else:
+            st.dataframe(priority_data)
+    else:
+        st.warning("No biographical data available.")
+    
+elif st.session_state.active_tab == "Injury":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
+
+    st.header("❌ Injury & Medical Overview")
+    st.markdown("Tracking injuries and analyzing availability trends.")
+
+    if not recovery_data.empty:
+        if "injury_status" in recovery_data.columns:
+            st.subheader("📊 Injury status")
+            fig_injury = px.histogram(recovery_data, x="injury_status", title="Breakdown of injuries")
+            st.plotly_chart(fig_injury, use_container_width=True)
+
+            st.subheader("📅 Timeline des Blessures")
+            injury_timeline = recovery_data[recovery_data["injury_status"] != "None"]
+            if not injury_timeline.empty:
+                fig_timeline = px.scatter(injury_timeline, x="date", y="injury_status", color="injury_status", title="Injury history")
+                st.plotly_chart(fig_timeline, use_container_width=True)
+            else:
+                st.info("No injuries reported recently.")
+        else:
+            st.warning("No 'injury_status' column detected. Injury data unavailable.")
+    else:
+        st.info("No recovery or injury data available.")
+    
+elif st.session_state.active_tab == "External Factors":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
+
+    st.header("🌍 External Context")
+    st.markdown("Capture external influences like fatigue, travel, or psychological state that might impact performance.")
+
+    with st.form("external_note_form"):
+        note_date = st.date_input("📅 Date concerned", value=datetime.now())
+        player_options = ["Whole Team"] + [str(pid) for pid in sorted(gps_data["player_id"].dropna().unique())]
+        selected_player = st.selectbox("👤 Player concerned", options=player_options)
+        factor_type = st.selectbox("📌 Type of factor", ["Fatigue", "Travel", "Motivation", "Mental", "Weather", "Other"])
+        note_text = st.text_area("📝 Coach's Note")
+        submitted = st.form_submit_button("Save Note")
+
+        if submitted and note_text.strip():
+            if "external_notes" not in st.session_state:
+                st.session_state.external_notes = []
+            st.session_state.external_notes.append({
+                "date": note_date,
+                "player": selected_player,
+                "type": factor_type,
+                "note": note_text.strip()
+            })
+            st.success("✅ Note saved!")
+
+    if "external_notes" in st.session_state and st.session_state.external_notes:
+        st.markdown("### 📋 Coach Notes Summary")
+        notes_df = pd.DataFrame(st.session_state.external_notes)
+        st.dataframe(notes_df.sort_values("date", ascending=False), use_container_width=True)
+    else:
+        st.info("No external notes recorded yet.")
+    
+elif st.session_state.active_tab == "Position Heatmap":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
+
+    st.header("📍 Player Heatmap")
+    df = pd.DataFrame({
+        "player_id": np.random.choice([7, 10, 22], 300),
+        "x": np.random.normal(52.5, 20, 300),
+        "y": np.random.normal(34, 15, 300)
+    })
+    selected = st.selectbox("Choose Player", df["player_id"].unique())
+    player_df = df[df["player_id"] == selected]
+    fig, ax = plt.subplots(figsize=(10, 7))
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
     pitch.draw(ax=ax)
     pitch.kdeplot(player_df.x, player_df.y, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
+    st.pyplot(fig)
 
-    # ✅ Save image to temp file
-    tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig.savefig(tmp_img.name, format="png")
-    plt.close(fig)
+    if st.button("Download Player Report"):
+        report = generate_player_report(selected)
+        st.download_button("Download PDF", data=report, file_name=f"player_{selected}_report.pdf", mime="application/pdf")
+    
+elif st.session_state.active_tab == "Video Analysis":
+    if st.button("⬅️ Back to Home"):
+        st.session_state.active_tab = "Home"
+        st.rerun()
 
-    # ✅ Create PDF
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', size=14)
-    pdf.cell(200, 10, txt=f"Chelsea FC - Player #{player_id} Report", ln=True, align="C")
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt=f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True, align="C")
-    pdf.ln(10)
-    pdf.cell(200, 10, txt="Player Movement Heatmap", ln=True)
-
-    pdf.image(tmp_img.name, x=30, y=60, w=150)
-
-    # ✅ Return as bytes
-    return pdf.output(dest='S').encode('latin1')
-
-# --- Tabs ---
-tabs = st.tabs(["Squad Overview", "Load Demand", "Injury", "Physical Development", "Biography", "Recovery", "External Factors", "Position Heatmap"])
-
-# --- Squad Overview Tab ---
-with tabs[0]:
-    st.header("Squad Overview - Readiness & Load")
-    if not readiness_df.empty:
-        columns_to_display = [col for col in ["date", "distance", "recovery_score", "readiness_score"] if col in readiness_df.columns]
-        if columns_to_display:
-            st.dataframe(readiness_df[columns_to_display])
-        else:
-            st.warning("No readiness data available to display.")
-
-        st.markdown("#### Readiness Alerts")
-        for _, row in readiness_df.iterrows():
-            if row.readiness_score < 60:
-                st.error(f"⚠️ Player readiness score is low ({row.readiness_score}%) on {row.date.date()}")
-            elif row.readiness_score < 75:
-                st.warning(f"⚠️ Player readiness is moderate ({row.readiness_score}%) on {row.date.date()}")
+    st.header("🎥 Video Stat Detection")
+    video_file = st.file_uploader("Upload match video", type=["mp4"])
+    if video_file:
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp.write(video_file.read())
+        cap = cv2.VideoCapture(tmp.name)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) // 2)
+        ret, frame = cap.read()
+        cap.release()
+        if ret:
+            st.image(frame, channels="BGR", caption="Frame for OCR")
+            reader = easyocr.Reader(['en'])
+            result = reader.readtext(frame)
+            score_text = " ".join([text[1] for text in result if any(char.isdigit() for char in text[1])])
+            if score_text:
+                st.success(f"🎯 Detected Score: {score_text}")
             else:
-                st.success(f"✅ Player readiness is good ({row.readiness_score}%) on {row.date.date()}")
+                st.warning("❌ Score not detected")
+        else:
+            st.error("Could not read frame")
 
-        start_date = st.date_input("Report Start Date", value=datetime.now() - timedelta(days=7))
-        end_date = st.date_input("Report End Date", value=datetime.now())
-
-        if st.button("📥 Download Team PDF Report"):
-            report = generate_global_report(start_date, end_date)
-            st.download_button(
-                "Download Team Report",
-                data=report,
-                file_name="team_performance_report.pdf",
-                mime="application/pdf"
-            )
-    else:
-        st.info("No readiness data available.")
-
-# --- Load Demand Tab ---
-with tabs[1]:
-    st.header("Load Demand")
-    st.markdown("**GPS data analysis**")
-    if not gps_data.empty:
-        st.dataframe(gps_data)
-        if "distance" in gps_data.columns:
-            fig = px.line(gps_data.sort_values("date"), x='date', y='distance', title='Distance Covered Over Time')
-            st.plotly_chart(fig, use_container_width=True)
-
-        accel_cols = [col for col in gps_data.columns if "accel_decel" in col]
-        if accel_cols:
-            fig_accel = px.line(gps_data.sort_values("date"), x="date", y=accel_cols, title="Acceleration/Deceleration per Session")
-            st.plotly_chart(fig_accel, use_container_width=True)
-
-        if "distance" in gps_data.columns and "peak_speed" in gps_data.columns:
-            fig_gps = px.scatter(gps_data, x="distance", y="peak_speed", hover_data=["date"], title="Total Distance vs Peak Speed")
-            st.plotly_chart(fig_gps, use_container_width=True)
-
-        if "opposition_full" in gps_data.columns:
-            opposition_summary = gps_data.groupby("opposition_full")["distance"].mean().reset_index()
-            fig_opposition = px.bar(opposition_summary, x="opposition_full", y="distance", title="Average Distance by Opposition")
-            st.plotly_chart(fig_opposition, use_container_width=True)
-
-        st.markdown("#### Descriptive Statistics")
-        st.dataframe(gps_data.describe())
-    else:
-        st.info("No GPS data available.")
-
-# --- Injury Tab ---
-with tabs[2]:
-    st.header("Injury")
-    st.markdown("**Injury history and risk tracking**")
-    if 'injury_status' in recovery_data.columns:
-        fig_injury = px.histogram(recovery_data, x='injury_status', title='Current Injury Status Distribution')
-        st.plotly_chart(fig_injury, use_container_width=True)
-    else:
-        st.info("Injury-specific data not available in current dataset.")
-
-# --- Physical Development Tab ---
-with tabs[3]:
-    st.header("Physical Development")
-    st.markdown("**Physical test results and strength indicators**")
-    if not capability_data.empty:
-        st.dataframe(capability_data)
-        if 'MOVEMENTS' in capability_data.columns and 'BenchmarkPct' in capability_data.columns:
-            fig2 = px.bar(capability_data, x='MOVEMENTS', y='BenchmarkPct', title='Benchmark by Movement')
-            st.plotly_chart(fig2, use_container_width=True)
-        if 'Score' in capability_data.columns:
-            fig3 = px.box(capability_data, x='Test Name', y='Score', title='Distribution of Test Scores')
-            st.plotly_chart(fig3, use_container_width=True)
-    else:
-        st.info("No physical development data available.")
-
-# --- Biography Tab ---
-with tabs[4]:
-    st.header("Biography")
-    st.markdown("**Player profile and background**")
-    if not priority_data.empty:
-        st.dataframe(priority_data)
-        if "Tracking" in priority_data.columns:
-            status_counts = priority_data["Tracking"].value_counts().reset_index()
-            status_counts.columns = ["Status", "Count"]
-            fig_status = px.pie(status_counts, names="Status", values="Count", title="Goal Status Distribution")
-            st.plotly_chart(fig_status, use_container_width=True)
-    else:
-        st.info("No player biography data available.")
-
-# --- Recovery Tab ---
-with tabs[5]:
-    st.header("Recovery")
-    st.markdown("**Recovery metrics: subjective & physiological**")
-    if not recovery_data.empty:
-        st.dataframe(recovery_data)
-        if 'recovery_score' in recovery_data.columns:
-            fig3 = px.line(recovery_data.sort_values("date"), x='date', y='recovery_score', title='Recovery Score Over Time')
-            st.plotly_chart(fig3, use_container_width=True)
-
-        components = ["Sleep_composite", "Soreness_composite", "Nutrition_composite"]
-        available = [col for col in components if col in recovery_data.columns]
-        if available:
-            fig_multi = px.line(recovery_data.sort_values("date"), x='date', y=available, title='Recovery Component Breakdown')
-            st.plotly_chart(fig_multi, use_container_width=True)
-
-        st.markdown("### Descriptive Statistics")
-        st.dataframe(recovery_data.describe())
-    else:
-        st.info("No recovery data available.")
-
-# --- External Factors Tab ---
-with tabs[6]:
-    st.header("External Factors")
-    st.markdown("**Contextual elements influencing player performance**")
-    external_notes = st.text_area("Coach Observations / External Notes", help="Enter any notes related to travel, motivation, team dynamics, or external context.")
-    if external_notes:
-        st.success("Observation saved. (In a real system, this would be recorded to database or exportable log.)")
-    st.info("You can integrate external indicators such as sleep environment, family situation, or team morale if available.")
-
-# --- Position Heatmap Tab ---
-with tabs[7]:
-    st.header("Position Heatmap")
-    if not position_data.empty:
-        selected_player = st.selectbox("Select a player ID", position_data["player_id"].unique())
-        player_df = position_data[position_data["player_id"] == selected_player]
-
-        fig, ax = plt.subplots(figsize=(10, 7))
-        pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
-        pitch.draw(ax=ax)
-        pitch.kdeplot(player_df.x, player_df.y, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
-        st.pyplot(fig)
-
-        if st.button("📥 Download Player PDF Report"):
-            st.download_button(
-                "Download Player Report",
-                data=generate_player_report(selected_player),
-                file_name=f"player_{selected_player}_report.pdf",
-                mime="application/pdf"
-            )
-    else:
-        st.info("No position data available.")
-
-# --- Sidebar for data updates ---
-st.sidebar.header("Update Data")
-st.sidebar.markdown("**Add a new GPS session**")
-
+# ----------------------------
+# SIDEBAR: ADD NEW DATA
+# ----------------------------
+st.sidebar.header("➕ Add GPS Session")
 with st.sidebar.form("update_form"):
     date = st.text_input("Date (YYYY-MM-DD)")
     opposition = st.text_input("Opponent")
-    distance = st.number_input("Distance covered (in km)", min_value=0.0, step=0.1)
-    accel_decel = st.number_input("Accelerations/Decelerations (>2.5 m/s²)", min_value=0, step=1)
+    distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
+    accel_decel = st.number_input("Accelerations/Decelerations", min_value=0, step=1)
     submit = st.form_submit_button("Update")
-
     if submit:
-        new_row = {
-            "date": date,
-            "opposition_full": opposition,
-            "distance": distance,
-            "accel_decel_over_2_5": accel_decel
-        }
+        new_row = {"date": date, "opposition_full": opposition, "distance": distance, "accel_decel_over_2_5": accel_decel}
         gps_data = gps_data.append(new_row, ignore_index=True)
-        gps_data.to_csv(gps_data_path, index=False)
-        st.success("GPS data has been updated!")
-        st.experimental_rerun()
-
-st.sidebar.info("This interactive dashboard allows you to track player performance evolution in real time and update the data directly from the interface.")
+        gps_data.to_csv("CFC GPS Data.csv", index=False)
+        st.success("GPS data updated!")
+        st.rerun()
+st.sidebar.info("This dashboard transforms raw data into real-world coaching decisions.")
