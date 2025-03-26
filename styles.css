@@ -1,0 +1,92 @@
+/* ================================
+   Modernisation du CSS pour le Vizathon Chelsea FC Dashboard
+   ================================ */
+
+/* Corps de la page */
+body {
+    background-color: #eef2f3;
+    font-family: 'Poppins', sans-serif;
+    color: #222;
+    margin: 0;
+    padding: 0;
+}
+
+/* Sidebar améliorée */
+[data-testid="stSidebar"] {
+    background-color: #002f6c; /* Bleu Chelsea */
+    color: #ffffff;
+}
+
+/* Titres principaux */
+h1, h2, h3, h4, h5, h6 {
+    color: #002f6c;
+    font-weight: 700;
+}
+
+/* Personnalisation des métriques */
+[data-testid="stMetricValue"] {
+    font-size: 2.8em;
+    font-weight: bold;
+    color: #e63946; /* Rouge alerte */
+}
+
+/* Graphiques Plotly */
+.plotly-graph-div {
+    border: none;
+    border-radius: 12px;
+    background-color: #ffffff;
+    box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.15);
+    padding: 15px;
+    margin-bottom: 25px;
+}
+
+/* Conteneurs et marges */
+.css-18e3th9 {
+    padding: 1.5rem;
+}
+
+/* Boutons personnalisés */
+button {
+    background-color: #ff7f50;
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+button:hover {
+    background-color: #e63946;
+    transform: scale(1.05);
+}
+
+/* Cartes et sections */
+.card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+/* Tableaux */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+th, td {
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+th {
+    background-color: #002f6c;
+    color: #fff;
+    font-weight: bold;
+}
