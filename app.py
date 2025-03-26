@@ -2,8 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
+import numpy as np
+from mplsoccer import Pitch
+import matplotlib.pyplot as plt
 
-# --- Page configuration ---
+# ✅ Page configuration (must be first Streamlit command)
 st.set_page_config(page_title="Chelsea FC Vizathon Dashboard", layout="wide")
 
 # --- Inject custom CSS ---
@@ -27,6 +30,18 @@ def load_data(file_path):
     else:
         return pd.DataFrame()
 
+# --- Sample generated GPS coordinates (for heatmap simulation) ---
+def generate_sample_gps_coordinates():
+    data = {
+        "player_id": np.random.choice([7, 10, 22], size=300),
+        "x": np.random.normal(loc=52.5, scale=20, size=300),  # Width of field ~105m
+        "y": np.random.normal(loc=34, scale=15, size=300),    # Height of field ~68m
+        "timestamp": pd.date_range(start="2025-03-25 14:00", periods=300, freq="s")
+    }
+    return pd.DataFrame(data)
+
+position_data = generate_sample_gps_coordinates()
+
 # --- CSV file paths ---
 gps_data_path = "CFC GPS Data.csv"
 priority_data_path = "CFC Individual Priority Areas.csv"
@@ -45,7 +60,7 @@ for df in [gps_data, recovery_data, capability_data]:
         df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
 
 # --- Tabs ---
-tabs = st.tabs(["Load Demand", "Injury", "Physical Development", "Biography", "Recovery", "External Factors"])
+tabs = st.tabs(["Load Demand", "Injury", "Physical Development", "Biography", "Recovery", "External Factors", "Position Heatmap"])
 
 # --- Load Demand Tab ---
 with tabs[0]:
@@ -147,6 +162,33 @@ with tabs[5]:
     st.header("External Factors")
     st.markdown("**External factors that may influence performance**")
     st.write("Module to be implemented according to available data.")
+
+# --- Position Heatmap Tab ---
+with tabs[6]:
+    st.header("Position Heatmap")
+    st.markdown("**Visualization of player movements on a football pitch**")
+
+    if not position_data.empty:
+        selected_player = st.selectbox("Select a player ID", position_data["player_id"].unique())
+        player_df = position_data[position_data["player_id"] == selected_player]
+
+        fig, ax = plt.subplots(figsize=(10, 7))
+        pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+        pitch.draw(ax=ax)
+
+        kde = pitch.kdeplot(
+            player_df.x,
+            player_df.y,
+            ax=ax,
+            cmap="Reds",
+            fill=True,
+            levels=100,
+            alpha=0.5  # 👈 ajuste ici entre 0 (transparent) et 1 (opaque)
+            )
+
+        st.pyplot(fig)
+    else:
+        st.info("No position data available.")
 
 # --- Sidebar for data updates ---
 st.sidebar.header("Update Data")
