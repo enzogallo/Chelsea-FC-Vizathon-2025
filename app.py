@@ -38,7 +38,7 @@ def render_home():
         {"label": "Biography", "icon": "📇", "tab": "Biography"},
         {"label": "Injury", "icon": "❌", "tab": "Injury"},
         {"label": "External Factors", "icon": "🌍", "tab": "External Factors"},
-        {"label": "Position Heatmap", "icon": "📍", "tab": "Position Heatmap"},
+        {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
         {"label": "Video Analysis", "icon": "🎥", "tab": "Video Analysis"},
     ]
 
@@ -61,6 +61,29 @@ def render_home():
                     st.session_state.active_tab = card["tab"]
                     st.rerun()
 
+def render_match_analysis():
+    st.header("⚽ Match Events Analysis")
+    
+    event_data = pd.read_csv("CFC Match Events Data.csv")
+    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
+
+    selected_player = st.selectbox("Select Player", sorted(event_data["player_id"].unique()))
+    selected_event = st.selectbox("Select Event Type", sorted(event_data["event_type"].unique()))
+
+    filtered = event_data[
+        (event_data["player_id"] == selected_player) &
+        (event_data["event_type"] == selected_event)
+    ]
+
+    st.subheader(f"🎯 {selected_event.title()} Map for Player {selected_player}")
+    fig, ax = plt.subplots(figsize=(10, 7))
+    pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+    pitch.draw(ax=ax)
+    pitch.scatter(filtered["x"], filtered["y"], ax=ax, edgecolor='black', alpha=0.7, s=80)
+    st.pyplot(fig)
+
+    st.subheader("📋 Event Table")
+    st.dataframe(filtered.sort_values("timestamp"))
 
 def local_css(file_name):
     with open(file_name) as f:
@@ -487,7 +510,7 @@ elif st.session_state.active_tab == "External Factors":
     else:
         st.info("No external notes recorded yet.")
     
-elif st.session_state.active_tab == "Position Heatmap":
+elif st.session_state.active_tab == "Match Analysis":
     if st.button("⬅️ Back to Home"):
         st.session_state.active_tab = "Home"
         st.rerun()
@@ -505,6 +528,27 @@ elif st.session_state.active_tab == "Position Heatmap":
     pitch.draw(ax=ax)
     pitch.kdeplot(player_df.x, player_df.y, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
     st.pyplot(fig)
+
+    st.subheader("📍 Event Map by Type")
+    event_data = pd.read_csv("CFC Match Events Data.csv")
+    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
+
+    selected_player_event = st.selectbox("🎯 Select Player", sorted(event_data["player_id"].unique()), key="match_event_player")
+    selected_event_type = st.selectbox("⚽ Select Event Type", sorted(event_data["event_type"].unique()), key="match_event_type")
+
+    filtered_events = event_data[
+        (event_data["player_id"] == selected_player_event) &
+        (event_data["event_type"] == selected_event_type)
+    ]
+
+    fig2, ax2 = plt.subplots(figsize=(10, 7))
+    pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+    pitch.draw(ax=ax2)
+    pitch.scatter(filtered_events["x"], filtered_events["y"], ax=ax2, edgecolor='black', alpha=0.7, s=80)
+    st.pyplot(fig2)
+
+    st.subheader("📋 Event Table")
+    st.dataframe(filtered_events.sort_values("timestamp"))
 
     if st.button("Download Player Report"):
         report = generate_player_report(selected)
