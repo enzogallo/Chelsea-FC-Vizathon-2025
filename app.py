@@ -6,6 +6,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from mplsoccer import Pitch
 import matplotlib.pyplot as plt
+import seaborn as sns
 from io import BytesIO
 from fpdf import FPDF
 import tempfile
@@ -14,11 +15,14 @@ import easyocr
 import base64
 import urllib.parse
 import time
+import seaborn as sns
 
 # ----------------------------
 # CONFIGURATION & SETUP
 # ----------------------------
 st.set_page_config(page_title="Chelsea FC Vizathon Dashboard", layout="wide")
+
+PLAYER_NAMES = {7: "Sterling", 10: "Mudryk", 22: "Chilwell"}
 
 params = st.query_params
 if "tab" in params:
@@ -125,6 +129,13 @@ gps_data = load_data("CFC GPS Data.csv")
 if "player_id" not in gps_data.columns:
     gps_data["player_id"] = np.random.choice([7, 10, 22], size=len(gps_data))
 recovery_data = load_data("CFC Recovery status Data.csv")
+if "injury_status" not in recovery_data.columns:
+    np.random.seed(42)
+    recovery_data["injury_status"] = np.random.choice(
+        ["None", "Hamstring", "Knee", "Ankle", "Fatigue"],
+        size=len(recovery_data),
+        p=[0.7, 0.1, 0.08, 0.07, 0.05]
+    )
 if "player_id" not in recovery_data.columns:
     recovery_data["player_id"] = np.random.choice([7, 10, 22], size=len(recovery_data))
 if "recovery_score" not in recovery_data.columns:
@@ -138,7 +149,34 @@ if recovery_data["recovery_score"].isnull().all():
     recovery_data["recovery_score"] = np.random.uniform(50, 95, size=len(recovery_data)).round(1)
 priority_data = load_data("CFC Individual Priority Areas.csv")
 capability_data = load_data("CFC Physical Capability Data_.csv")
-capability_data.columns = capability_data.columns.str.strip().str.lower()
+if not capability_data.empty:
+    capability_data.columns = (
+        capability_data.columns
+        .str.strip()
+        .str.lower()
+        .str.replace("ï»¿", "", regex=False)  # Remove BOM if present
+    )
+    # Rename misformatted columns
+    if "benchmarkpct" in capability_data.columns:
+        capability_data.rename(columns={"benchmarkpct": "benchmarkpct"}, inplace=True)
+    if "player id" in capability_data.columns:
+        capability_data.rename(columns={"player id": "player_id"}, inplace=True)
+    if "player_name" in capability_data.columns:
+        capability_data.rename(columns={"player_name": "player_id"}, inplace=True)
+    if "player_id" not in capability_data.columns:
+        capability_data["player_id"] = np.random.choice([7, 10, 22], size=len(capability_data))
+
+# Try to infer player_id if missing (only if capability_data is not empty)
+if not capability_data.empty:
+    if "player_id" not in capability_data.columns:
+        if "player name" in capability_data.columns or "player_name" in capability_data.columns:
+            name_col = "player name" if "player name" in capability_data.columns else "player_name"
+            name_to_id = {v.lower(): k for k, v in PLAYER_NAMES.items()}
+            capability_data["player_id"] = capability_data[name_col].str.lower().map(name_to_id)
+required_capability_cols = {"player_id", "movement", "benchmarkpct"}
+missing_cols = required_capability_cols - set(capability_data.columns)
+if missing_cols:
+    st.warning(f"❌ Required columns missing in capability_data: {missing_cols}")
 
 # Format columns
 if "sessionDate" in recovery_data.columns:
@@ -251,7 +289,7 @@ def generate_pdf_report(df, title="Team Report", score=None):
 if st.session_state.active_tab == "Home":
     render_home()
 elif st.session_state.active_tab == "Squad Overview":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_squad"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
@@ -263,6 +301,10 @@ elif st.session_state.active_tab == "Squad Overview":
     This module helps you understand the **team's physical availability and fatigue levels**.
     It provides **daily insights** to help adjust your training load, plan recovery, and reduce injury risks.
     """)
+    st.markdown("### 🧾 What You’ll Learn")
+    st.markdown("- Daily and weekly readiness trend")
+    st.markdown("- Players at risk of underperformance")
+    st.markdown("- Relationship with training load and recovery")
  
     if not readiness_df.empty:
         st.markdown("This section gives you an overview of the team's physical availability..")
@@ -325,7 +367,11 @@ elif st.session_state.active_tab == "Squad Overview":
             for col in required_cols:
                 if col not in readiness_df.columns:
                     readiness_df[col] = np.nan
-            st.dataframe(readiness_df[required_cols])
+            styled_df = readiness_df[required_cols].style.applymap(
+                lambda v: 'background-color: red' if isinstance(v, (int, float)) and v < 60 else '',
+                subset=["readiness_score"]
+            )
+            st.dataframe(styled_df)
         st.markdown("### 📘 Coach Interpretation")
         st.markdown("""
         - **Above 75%**: Players are fresh and ready – optimal training intensity possible.
@@ -338,7 +384,7 @@ elif st.session_state.active_tab == "Squad Overview":
         st.info("No data available for the moment.")
 
 elif st.session_state.active_tab == "Load Demand":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_load"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
@@ -438,12 +484,14 @@ elif st.session_state.active_tab == "Load Demand":
         st.caption("Highlights the average distance covered against each opponent — helps understand match demands.")
     
 elif st.session_state.active_tab == "Recovery":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_recovery"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
     st.header("🛌 Recovery Overview")
+
+    st.markdown("🧪 **Recovery Score** – subjective score (0-100) of how recovered a player feels after effort.")
 
     st.markdown("""
     This module helps you assess **player recovery status** and anticipate **readiness risks**.
@@ -469,7 +517,7 @@ elif st.session_state.active_tab == "Recovery":
             existing_recovery = pd.read_csv(recovery_path) if os.path.exists(recovery_path) else pd.DataFrame()
             updated_recovery = pd.concat([existing_recovery, pd.DataFrame([new_entry])], ignore_index=True)
             updated_recovery.to_csv(recovery_path, index=False)
-            st.success("✅ Recovery entry added successfully.")
+            st.success(f"✅ Recovery entry added for {PLAYER_NAMES.get(rec_player)} with score {rec_score}")
             st.rerun()
 
     # ---- Recovery Visuals ----
@@ -515,11 +563,12 @@ elif st.session_state.active_tab == "Recovery":
                 recovery_data,
                 x="date",
                 y="recovery_score",
-                facet_col="player_id",
-                facet_col_wrap=3,
-                title="Individual Recovery Trends",
-                labels={"recovery_score": "Recovery (%)", "date": "Date"}
+                color="player_id",
+                markers=True,
+                title="Recovery Score per Player",
+                labels={"recovery_score": "Recovery (%)", "date": "Date", "player_id": "Player"}
             )
+            fig_facet.update_traces(mode="lines+markers")
             st.plotly_chart(fig_facet, use_container_width=True)
 
     st.subheader("⚖️ Recovery vs Training Load")
@@ -547,10 +596,11 @@ elif st.session_state.active_tab == "Recovery":
             x="distance",
             y="recovery_score",
             trendline="ols",
-            opacity=0.6,
+            opacity=0.7,
+            color="player_id" if selected_player == "All" else None,
             title=title,
-            labels={"distance": "Distance (m)", "recovery_score": "Recovery Score (%)"},
-            color_discrete_sequence=["#1DA1F2"]
+            labels={"distance": "Distance (m)", "recovery_score": "Recovery (%)"},
+            hover_data=["date"]
         )
         fig_corr.update_layout(height=500)
         st.plotly_chart(fig_corr, use_container_width=True)
@@ -560,7 +610,7 @@ elif st.session_state.active_tab == "Recovery":
         st.info("No recovery data available.")
     
 elif st.session_state.active_tab == "Physical Development":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_physical"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
@@ -568,51 +618,59 @@ elif st.session_state.active_tab == "Physical Development":
     st.header("🏋️ Physical Test Results")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
-    if not capability_data.empty:
-        st.markdown("Cette section vous permet d'évaluer les capacités physiques des joueurs par rapport à des benchmarks de référence.")
 
+    if not capability_data.empty:
+        st.markdown("""
+        This section helps you **evaluate physical capabilities** of each player through objective testing.
+        Tests include sprints, jumps, strength, and mobility benchmarks. 
+
+        👉 These tests help identify:
+        - Strengths and development areas
+        - Injury risk indicators
+        - Progress over time
+        """)
+
+        st.subheader("📊 Performance vs Benchmark (by Movement Type)")
         if 'movement' in capability_data.columns and 'benchmarkpct' in capability_data.columns:
-            st.subheader("📊 Comparaison aux Benchmarks")
             fig_benchmark = px.bar(
                 capability_data,
                 x='movement',
                 y='benchmarkpct',
                 color='movement',
-                title="💪 Pourcentage de Benchmark atteint par mouvement",
-                labels={'benchmarkpct': '% du benchmark'},
+                title="💪 Benchmark % Reached per Movement",
+                labels={'benchmarkpct': '% Benchmark'},
+                text_auto=True
             )
+            fig_benchmark.update_layout(yaxis_range=[0, 120])
             st.plotly_chart(fig_benchmark, use_container_width=True)
-            st.caption("Shows how players perform against predefined benchmarks for each movement type, helping coaches spot top performers or areas for focus.")
+            st.caption("Each bar shows the % of the benchmark reached by players for a specific movement (e.g., squat, sprint). Values >100% mean players exceeded the standard.")
+            
+            st.subheader("🌡️ Player vs Movement Heatmap")
+            st.markdown("Visual comparison of each player's performance per movement — helps identify strengths and weaknesses at a glance.")
+            
+            if 'player_id' in capability_data.columns and 'movement' in capability_data.columns and 'benchmarkpct' in capability_data.columns:
+                heatmap_data = capability_data.pivot_table(index='player_id', columns='movement', values='benchmarkpct')
+                heatmap_data.index = heatmap_data.index.map(PLAYER_NAMES.get)
+                fig_heatmap, ax = plt.subplots(figsize=(12, 6))
+                sns.heatmap(heatmap_data, cmap="RdYlGn", annot=True, fmt=".0f", ax=ax, linewidths=.5, cbar_kws={"label": "% Benchmark"})
+                st.pyplot(fig_heatmap)
+            else:
+                st.warning("❌ Required columns not found in capability_data.")
 
+        st.subheader("📦 Score Spread per Test Type")
         if 'test name' in capability_data.columns and 'score' in capability_data.columns:
-            st.subheader("📈 Score distribution by test")
             fig_score = px.box(
                 capability_data,
                 x='test name',
                 y='score',
                 points='all',
-                title='📦 Scores by Test',
-                labels={'score': 'score', 'test name': 'Test'}
+                title='Score Spread for Each Test',
+                labels={'score': 'Score', 'test name': 'Test'}
             )
             st.plotly_chart(fig_score, use_container_width=True)
-            st.caption("Displays score variability per test, helping identify consistency and outliers in player assessments.")
- 
-        st.markdown("### 📊 Performance Comparative par Mouvement")
- 
-        if "player name" in capability_data.columns and "movement" in capability_data.columns and "benchmarkpct" in capability_data.columns:
-            fig_compare = px.box(
-                capability_data.dropna(subset=["benchmarkpct"]),
-                x="movement",
-                y="benchmarkpct",
-                points="all",
-                color="movement",
-                title="📦 Performance distribution by movement",
-                labels={"benchmarkpct": "% du benchmark atteint", "movement": "Mouvement"}
-            )
-            st.plotly_chart(fig_compare, use_container_width=True)
-            st.caption("This boxplot compares player performance across different movement types, highlighting strengths and development areas.")
- 
-        st.markdown("### 🔍 Progress of physical tests over time")
+            st.caption("This view helps spot test variability: large spreads may suggest inconsistency or need for standardization.")
+
+        st.subheader("📈 Progression Over Time")
         if "testDate" in capability_data.columns and "benchmarkpct" in capability_data.columns:
             try:
                 capability_data["testDate"] = pd.to_datetime(capability_data["testDate"], dayfirst=True, errors="coerce")
@@ -627,21 +685,32 @@ elif st.session_state.active_tab == "Physical Development":
                     trend,
                     x="testDate",
                     y="benchmarkpct",
-                    title="📈 Evolution of Average Performance over Time",
-                    labels={"benchmarkpct": "% Benchmark", "testDate": "Date"}
+                    title="📈 Evolution of Avg Benchmark % Over Time",
+                    labels={"benchmarkpct": "% Benchmark", "testDate": "Date"},
+                    markers=True
                 )
+                fig_trend.add_hline(y=100, line_dash="dot", line_color="green")
                 st.plotly_chart(fig_trend, use_container_width=True)
-                st.caption("This trendline shows how average physical performance (as % of benchmark) evolves over time. Useful to monitor training effectiveness.")
+                st.caption("If values trend upwards, physical conditioning is improving. Staying around 100% means players are at expected level.")
             except Exception as e:
-                st.warning("Cannot display time trend: data error.")
- 
-        st.subheader("📋 Données Brutes")
+                st.warning("Cannot display time trend: invalid test dates")
+
+        st.subheader("📘 Coach Takeaways")
+        st.markdown("""
+        - Focus on movements **below 80%** – indicates room for physical development
+        - Encourage maintenance or further improvement for **players above 100%**
+        - Re-test regularly to track progress
+
+        💡 **Tip**: Use this data to adapt training programs based on individual weaknesses (e.g. mobility, strength).
+        """)
+
+        st.subheader("📋 Raw Data Table")
         st.dataframe(capability_data)
     else:
         st.warning("No physical development data available.")
     
 elif st.session_state.active_tab == "Biography":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_biography"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
@@ -686,7 +755,7 @@ elif st.session_state.active_tab == "Biography":
         st.warning("No biographical data available.")
     
 elif st.session_state.active_tab == "Injury":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_injury"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
@@ -715,7 +784,7 @@ elif st.session_state.active_tab == "Injury":
         st.info("No recovery or injury data available.")
     
 elif st.session_state.active_tab == "External Factors":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_external"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
@@ -752,7 +821,7 @@ elif st.session_state.active_tab == "External Factors":
         st.info("No external notes recorded yet.")
     
 elif st.session_state.active_tab == "Match Analysis":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_match"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
@@ -833,7 +902,7 @@ elif st.session_state.active_tab == "Match Analysis":
         st.download_button("Download PDF", data=report, file_name=f"player_{selected}_report.pdf", mime="application/pdf")
     
 elif st.session_state.active_tab == "Video Analysis":
-    if st.button("⬅️ Back to Home"):
+    if st.button("⬅️ Back to Home", key="back_home_video"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
