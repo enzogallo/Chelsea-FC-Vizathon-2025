@@ -13,6 +13,7 @@ import cv2
 import easyocr
 import base64
 import urllib.parse
+import time
 
 # ----------------------------
 # CONFIGURATION & SETUP
@@ -27,10 +28,10 @@ if "active_tab" not in st.session_state:
     st.session_state.active_tab = "Home"
 
 def render_home():
-    st.markdown("## 📊 Dashboard Modules")
     cols = st.columns(3)
 
     cards = [
+        {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
         {"label": "Squad Overview", "icon": "🧠", "tab": "Squad Overview"},
         {"label": "Load Demand", "icon": "📈", "tab": "Load Demand"},
         {"label": "Recovery", "icon": "🛌", "tab": "Recovery"},
@@ -38,7 +39,6 @@ def render_home():
         {"label": "Biography", "icon": "📇", "tab": "Biography"},
         {"label": "Injury", "icon": "❌", "tab": "Injury"},
         {"label": "External Factors", "icon": "🌍", "tab": "External Factors"},
-        {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
         {"label": "Video Analysis", "icon": "🎥", "tab": "Video Analysis"},
     ]
 
@@ -58,6 +58,7 @@ def render_home():
 
                 # Bouton avec clé unique (ajout d'un préfixe)
                 if st.button(f"{card['icon']} {card['label']}", key=f"btn_{card['tab']}"):
+                    show_spinner()
                     st.session_state.active_tab = card["tab"]
                     st.rerun()
 
@@ -67,23 +68,20 @@ def render_match_analysis():
     event_data = pd.read_csv("CFC Match Events Data.csv")
     event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
 
-    selected_player = st.selectbox("Select Player", sorted(event_data["player_id"].unique()))
-    selected_event = st.selectbox("Select Event Type", sorted(event_data["event_type"].unique()))
+    if selected_player != "All":
+        filtered_events = event_data[event_data["player_id"] == selected_player]
+    else:
+        filtered_events = event_data
 
-    filtered = event_data[
-        (event_data["player_id"] == selected_player) &
-        (event_data["event_type"] == selected_event)
-    ]
-
-    st.subheader(f"🎯 {selected_event.title()} Map for Player {selected_player}")
-    fig, ax = plt.subplots(figsize=(10, 7))
+    st.subheader("📍 Match Events Heatmap")
+    fig, ax = plt.subplots(figsize=(7, 5))
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
     pitch.draw(ax=ax)
-    pitch.scatter(filtered["x"], filtered["y"], ax=ax, edgecolor='black', alpha=0.7, s=80)
+    pitch.scatter(filtered_events["x"], filtered_events["y"], ax=ax, edgecolor='black', alpha=0.7, s=80)
     st.pyplot(fig)
 
     st.subheader("📋 Event Table")
-    st.dataframe(filtered.sort_values("timestamp"))
+    st.dataframe(filtered_events.sort_values("timestamp"))
 
 def local_css(file_name):
     with open(file_name) as f:
@@ -91,9 +89,25 @@ def local_css(file_name):
 
 local_css("styles.css")
 
+def show_spinner():
+    spinner_html = """
+    <div style="position:fixed; top:0; left:0; width:100%; height:100vh; background-color:rgba(0,0,0,0.9); z-index:9999; display:flex; align-items:center; justify-content:center;">
+        <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" width="100" style="animation:spin 2s linear infinite;" />
+    </div>
+    <style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    </style>
+    """
+    st.markdown(spinner_html, unsafe_allow_html=True)
+    time.sleep(0.8)
+
 st.markdown("""
-<div style="background-color:#034694; padding:2rem 1rem; border-radius:1rem; color:white; text-align:center; margin-bottom:2rem;">
-    <h1 style="margin:0; font-size:2.5rem;">Chelsea FC Vizathon Dashboard</h1>
+<div style="background-color:#034694; padding:2rem 2rem; border-radius:1rem; color:white; text-align:center; margin-bottom:3rem;">
+    <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:85px; margin-bottom:1rem;" />
+    <h1 style="margin:0; font-size:2.6rem;">Chelsea FC Vizathon Dashboard</h1>
     <p style="margin-top:0.8rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
         Designed for elite coaches: actionable insights, no data science degree required.
     </p>
@@ -111,6 +125,8 @@ gps_data = load_data("CFC GPS Data.csv")
 if "player_id" not in gps_data.columns:
     gps_data["player_id"] = np.random.choice([7, 10, 22], size=len(gps_data))
 recovery_data = load_data("CFC Recovery status Data.csv")
+if "player_id" not in recovery_data.columns:
+    recovery_data["player_id"] = np.random.choice([7, 10, 22], size=len(recovery_data))
 if "recovery_score" not in recovery_data.columns:
     if "Subjective_composite" in recovery_data.columns:
         recovery_data.rename(columns={"Subjective_composite": "recovery_score"}, inplace=True)
@@ -135,24 +151,27 @@ for df in [gps_data, recovery_data, capability_data]:
 
 # ----------------------------
 # === Global Player Filter ===
-st.sidebar.header("🎯 Player Filter")
-all_players = sorted(gps_data["player_id"].dropna().unique())
-selected_player = st.sidebar.selectbox("Select a player to filter all modules", options=["All"] + list(map(str, all_players)))
+if st.session_state.active_tab != "Home":
+    st.sidebar.header("🎯 Player Filter")
+    all_players = sorted(gps_data["player_id"].dropna().unique())
+    selected_player = st.sidebar.selectbox("Select a player to filter all modules", options=["All"] + list(map(str, all_players)))
 
-if selected_player != "All":
-    selected_player = int(selected_player)
+    if selected_player != "All":
+        selected_player = int(selected_player)
 
-if selected_player != "All":
-    gps_data = gps_data[gps_data["player_id"] == selected_player]
+    if selected_player != "All":
+        gps_data = gps_data[gps_data["player_id"] == selected_player]
       
-    if "player_id" in recovery_data.columns:
-        recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
+        if "player_id" in recovery_data.columns:
+            recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
 
-    if "player name" in capability_data.columns:
-        capability_data = capability_data[capability_data["player name"] == str(selected_player)]
+        if "player name" in capability_data.columns:
+            capability_data = capability_data[capability_data["player name"] == str(selected_player)]
 
-    if "Player Name" in priority_data.columns:
-        priority_data = priority_data[priority_data["Player Name"] == str(selected_player)]
+        if "Player Name" in priority_data.columns:
+            priority_data = priority_data[priority_data["Player Name"] == str(selected_player)]
+else:
+    selected_player = "All"
 
 # ----------------------------
 # READINESS SCORE
@@ -233,6 +252,7 @@ if st.session_state.active_tab == "Home":
     render_home()
 elif st.session_state.active_tab == "Squad Overview":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
@@ -319,10 +339,35 @@ elif st.session_state.active_tab == "Squad Overview":
 
 elif st.session_state.active_tab == "Load Demand":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
     st.header("📈 Match Load Analysis")
+
+    st.subheader("➕ Add Training Load Entry")
+    with st.form("add_training_load_form"):
+        ld_date = st.date_input("📅 Date", value=datetime.today(), key="ld_date")
+        ld_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="ld_player")
+        ld_distance = st.number_input("🏃 Distance (m)", min_value=0, value=5000, step=100, key="ld_distance")
+        ld_oppo = st.text_input("🏟️ Opponent (optional)", key="ld_oppo")
+        ld_accel = st.number_input("⚡ Accel/Decel (>2.5 m/s²)", min_value=0, step=1, value=12, key="ld_accel")
+        submit_ld = st.form_submit_button("Add Load Entry")
+        if submit_ld:
+            new_entry = {
+                "date": ld_date,
+                "player_id": ld_player,
+                "distance": ld_distance,
+                "opposition_full": ld_oppo,
+                "accel_decel_over_2_5": ld_accel
+            }
+            gps_path = "CFC GPS Data.csv"
+            existing_gps = pd.read_csv(gps_path) if os.path.exists(gps_path) else pd.DataFrame()
+            updated_gps = pd.concat([existing_gps, pd.DataFrame([new_entry])], ignore_index=True)
+            updated_gps.to_csv(gps_path, index=False)
+            st.success("✅ Training load entry added successfully.")
+            st.rerun()
+
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     player_list = gps_data["player_id"].dropna().unique()
@@ -394,52 +439,129 @@ elif st.session_state.active_tab == "Load Demand":
     
 elif st.session_state.active_tab == "Recovery":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
     st.header("🛌 Recovery Overview")
-    if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
-    st.subheader("📊 Daily Team Recovery Summary")
-    if "recovery_score" in recovery_data.columns:
-        daily_avg = recovery_data.groupby("date")["recovery_score"].mean().reset_index()
-        st.line_chart(daily_avg.rename(columns={"date": "index"}).set_index("index"))
 
-        latest_score = daily_avg["recovery_score"].iloc[-1]
-        if latest_score < 50:
-            st.error(f"🟥 Latest team recovery average is very low ({latest_score:.1f}%) — caution advised.")
-        elif latest_score < 70:
-            st.warning(f"🟧 Latest team recovery is moderate ({latest_score:.1f}%).")
+    st.markdown("""
+    This module helps you assess **player recovery status** and anticipate **readiness risks**.
+    It allows you to track recovery trends, spot under-recovered athletes, and adjust training accordingly.
+    """)
+
+    # ➕ Add Recovery Entry Form
+    st.subheader("➕ Add Recovery Entry")
+    with st.form("add_recovery_entry_form"):
+        rec_date = st.date_input("📅 Recovery Date", value=datetime.today(), key="rec_date")
+        rec_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="rec_player")
+        rec_score = st.slider("🧪 Recovery Score (0-100)", min_value=0, max_value=100, value=75, key="rec_score")
+        rec_note = st.text_area("📝 Optional Notes", key="rec_note")
+        submit_recovery = st.form_submit_button("Add Recovery Entry")
+        if submit_recovery:
+            new_entry = {
+                "date": rec_date,
+                "player_id": rec_player,
+                "recovery_score": rec_score,
+                "note": rec_note
+            }
+            recovery_path = "CFC Recovery status Data.csv"
+            existing_recovery = pd.read_csv(recovery_path) if os.path.exists(recovery_path) else pd.DataFrame()
+            updated_recovery = pd.concat([existing_recovery, pd.DataFrame([new_entry])], ignore_index=True)
+            updated_recovery.to_csv(recovery_path, index=False)
+            st.success("✅ Recovery entry added successfully.")
+            st.rerun()
+
+    # ---- Recovery Visuals ----
+    if not recovery_data.empty:
+        st.subheader("📈 Weekly Average Recovery Trend")
+        st.markdown("Smooths out daily fluctuations to highlight overall team fatigue or freshness across weeks.")
+
+        recovery_data["week"] = pd.to_datetime(recovery_data["date"]).dt.to_period("W").dt.start_time
+        weekly_avg = recovery_data.groupby("week")["recovery_score"].mean().reset_index()
+
+        fig_weekly = px.line(weekly_avg, x="week", y="recovery_score", markers=True,
+                            title="Team Recovery Score per Week",
+                            labels={"recovery_score": "Avg Recovery (%)", "week": "Week"})
+        fig_weekly.add_hrect(y0=0, y1=50, fillcolor="red", opacity=0.1, line_width=0)
+        fig_weekly.add_hrect(y0=50, y1=70, fillcolor="orange", opacity=0.1, line_width=0)
+        fig_weekly.add_hrect(y0=70, y1=100, fillcolor="green", opacity=0.1, line_width=0)
+        st.plotly_chart(fig_weekly, use_container_width=True)
+
+        latest_weekly_score = weekly_avg["recovery_score"].iloc[-1]
+        if latest_weekly_score < 50:
+            st.error(f"🟥 Latest weekly average recovery is very low ({latest_weekly_score:.1f}%) — prioritize recovery this week.")
+        elif latest_weekly_score < 70:
+            st.warning(f"🟧 Moderate weekly average recovery ({latest_weekly_score:.1f}%) — consider load adaptation.")
         else:
-            st.success(f"🟩 Team is well recovered ({latest_score:.1f}%) today.")
-    st.subheader("🕵️‍♂️ Players with Low Recovery Scores")
-    if "recovery_score" in recovery_data.columns and "player_id" in recovery_data.columns:
+            st.success(f"🟩 Players are well recovered this week ({latest_weekly_score:.1f}%).")
+
+        st.subheader("🧍‍♂️ Players With Low Recovery")
+        st.markdown("Identifies players under 60% recovery in the last 3 days.")
         recent = recovery_data[recovery_data["date"] >= recovery_data["date"].max() - pd.Timedelta(days=3)]
         low_scores = recent[recent["recovery_score"] < 60]
         if not low_scores.empty:
-            st.dataframe(low_scores[["date", "player_id", "recovery_score"]].sort_values("date", ascending=False))
+            expected_cols = ["date", "player_id", "recovery_score"]
+            available_cols = [col for col in expected_cols if col in low_scores.columns]
+            st.dataframe(low_scores[available_cols].sort_values("date", ascending=False))
         else:
-            st.success("✅ No players with critical recovery levels in the last 3 days.")
-    if not recovery_data.empty:
-        st.dataframe(recovery_data)
-        if "recovery_score" in recovery_data.columns:
-            st.plotly_chart(px.line(recovery_data, x="date", y="recovery_score", title="Recovery Score Trend"))
-        st.subheader("⚖️ Recovery vs Load (Correlation)")
-        merged = pd.merge(gps_data, recovery_data, on="date", how="inner")
-        if "recovery_score" in merged.columns and "distance" in merged.columns:
-            fig_corr = px.scatter(
-                merged,
-                x="distance",
+            st.success("✅ No players under recovery threshold in last 3 days.")
+
+        st.subheader("📉 Player-by-Player Recovery Score Trends")
+        st.markdown("Visualizes individual recovery evolution — helps quickly spot fatigue risks per player.")
+
+        if "player_id" in recovery_data.columns:
+            fig_facet = px.line(
+                recovery_data,
+                x="date",
                 y="recovery_score",
-                color="player_id" if "player_id" in merged.columns else None,
-                title="Recovery vs Distance Covered"
+                facet_col="player_id",
+                facet_col_wrap=3,
+                title="Individual Recovery Trends",
+                labels={"recovery_score": "Recovery (%)", "date": "Date"}
             )
-            st.plotly_chart(fig_corr, use_container_width=True)
+            st.plotly_chart(fig_facet, use_container_width=True)
+
+    st.subheader("⚖️ Recovery vs Training Load")
+    st.markdown("""
+    This graph helps evaluate whether higher physical loads (distance) negatively impact a player’s recovery.
+    
+    💡 **How to read this:**  
+    - Each dot is one training or match day.
+    - A **downward trend** = fatigue builds with higher workload (⚠️).
+    - A **flat or upward trend** = good recovery capacity (✅).
+    """)
+    
+    merged = pd.merge(gps_data, recovery_data, on=["date", "player_id"])
+    
+    if selected_player != "All":
+        player_data = merged[merged["player_id"] == selected_player]
+        title = f"Player {selected_player} – Distance vs Recovery Score"
+    else:
+        player_data = merged
+        title = "All Players – Distance vs Recovery Score"
+    
+    if not player_data.empty:
+        fig_corr = px.scatter(
+            player_data,
+            x="distance",
+            y="recovery_score",
+            trendline="ols",
+            opacity=0.6,
+            title=title,
+            labels={"distance": "Distance (m)", "recovery_score": "Recovery Score (%)"},
+            color_discrete_sequence=["#1DA1F2"]
+        )
+        fig_corr.update_layout(height=500)
+        st.plotly_chart(fig_corr, use_container_width=True)
+        st.caption("Trendline estimates whether recovery decreases with increased distance. A negative slope may signal overtraining.")
+
     else:
         st.info("No recovery data available.")
     
 elif st.session_state.active_tab == "Physical Development":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
@@ -520,10 +642,31 @@ elif st.session_state.active_tab == "Physical Development":
     
 elif st.session_state.active_tab == "Biography":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
     st.header("📇 Player Profile & Individual Objectives")
+
+    st.subheader("➕ Add Individual Goal")
+    with st.form("add_goal_form"):
+        bio_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="bio_player")
+        goal_desc = st.text_input("🎯 Goal Description", key="goal_desc")
+        goal_status = st.selectbox("📈 Tracking Status", ["In Progress", "Achieved", "Not Started"], key="goal_status")
+        submit_goal = st.form_submit_button("Add Goal")
+        if submit_goal:
+            new_entry = {
+                "Player Name": str(bio_player),
+                "Individual Goals": goal_desc,
+                "Tracking": goal_status
+            }
+            goals_path = "CFC Individual Priority Areas.csv"
+            existing_goals = pd.read_csv(goals_path) if os.path.exists(goals_path) else pd.DataFrame()
+            updated_goals = pd.concat([existing_goals, pd.DataFrame([new_entry])], ignore_index=True)
+            updated_goals.to_csv(goals_path, index=False)
+            st.success("✅ Goal added successfully.")
+            st.rerun()
+
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.markdown("This section provides an overview of the individual objectives set for players and their achievement status..")
@@ -544,6 +687,7 @@ elif st.session_state.active_tab == "Biography":
     
 elif st.session_state.active_tab == "Injury":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
@@ -572,6 +716,7 @@ elif st.session_state.active_tab == "Injury":
     
 elif st.session_state.active_tab == "External Factors":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
@@ -608,36 +753,71 @@ elif st.session_state.active_tab == "External Factors":
     
 elif st.session_state.active_tab == "Match Analysis":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
     st.header("📍 Player Heatmap")
+
+    st.subheader("➕ Add Match Event")
+    with st.form("add_match_event_form"):
+        match_date = st.date_input("📅 Match Date", value=datetime.today())
+        match_time = st.time_input("⏱️ Match Time", value=datetime.now().time())
+        event_timestamp = datetime.combine(match_date, match_time)
+
+        player_ids = sorted(gps_data["player_id"].dropna().unique())
+        event_player = st.selectbox("👤 Player Involved", options=player_ids)
+        event_type = st.selectbox("⚽ Event Type", options=["Pass", "Shot", "Dribble", "Tackle", "Interception", "Foul", "Save", "Clearance", "Cross", "Duel"])
+
+        x_coord = st.slider("📍 X Position on Field (0 = Left, 105 = Right)", min_value=0.0, max_value=105.0, value=52.5)
+        y_coord = st.slider("📍 Y Position on Field (0 = Bottom, 68 = Top)", min_value=0.0, max_value=68.0, value=34.0)
+
+        tags = st.text_input("🏷️ Tags (comma-separated)", help="Use tags like 'dangerous, counter-attack, assist' for better filtering.")
+        notes = st.text_area("📝 Additional Notes", help="Optional context for this event.")
+
+        submitted_event = st.form_submit_button("Add Event to Match Dataset")
+
+        if submitted_event:
+            event_entry = {
+                "timestamp": event_timestamp,
+                "player_id": event_player,
+                "event_type": event_type,
+                "x": round(x_coord, 2),
+                "y": round(y_coord, 2),
+                "tags": tags,
+                "notes": notes
+            }
+
+            events_path = "CFC Match Events Data.csv"
+            existing_events = pd.read_csv(events_path) if os.path.exists(events_path) else pd.DataFrame()
+            updated_events = pd.concat([existing_events, pd.DataFrame([event_entry])], ignore_index=True)
+            updated_events.to_csv(events_path, index=False)
+
+            st.success("✅ Match event successfully added.")
+            st.rerun()
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
-    df = pd.DataFrame({
-        "player_id": np.random.choice([7, 10, 22], 300),
-        "x": np.random.normal(52.5, 20, 300),
-        "y": np.random.normal(34, 15, 300)
-    })
-    selected = st.selectbox("Choose Player", df["player_id"].unique())
-    player_df = df[df["player_id"] == selected]
-    fig, ax = plt.subplots(figsize=(10, 7))
+    st.subheader("📍 Heatmap of Match Involvement")
+    event_data = pd.read_csv("CFC Match Events Data.csv")
+    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
+    if selected_player != "All":
+        filtered_events = event_data[event_data["player_id"] == selected_player]
+    else:
+        filtered_events = event_data
+    fig, ax = plt.subplots(figsize=(7, 5))
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
     pitch.draw(ax=ax)
-    pitch.kdeplot(player_df.x, player_df.y, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
+    pitch.kdeplot(filtered_events["x"], filtered_events["y"], ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
     st.pyplot(fig)
 
     st.subheader("📍 Event Map by Type")
     event_data = pd.read_csv("CFC Match Events Data.csv")
     event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
 
-    selected_player_event = st.selectbox("🎯 Select Player", sorted(event_data["player_id"].unique()), key="match_event_player")
-    selected_event_type = st.selectbox("⚽ Select Event Type", sorted(event_data["event_type"].unique()), key="match_event_type")
-
-    filtered_events = event_data[
-        (event_data["player_id"] == selected_player_event) &
-        (event_data["event_type"] == selected_event_type)
-    ]
+    if selected_player != "All":
+        filtered_events = event_data[event_data["player_id"] == selected_player]
+    else:
+        filtered_events = event_data
 
     fig2, ax2 = plt.subplots(figsize=(10, 7))
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
@@ -654,6 +834,7 @@ elif st.session_state.active_tab == "Match Analysis":
     
 elif st.session_state.active_tab == "Video Analysis":
     if st.button("⬅️ Back to Home"):
+        show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
@@ -679,21 +860,3 @@ elif st.session_state.active_tab == "Video Analysis":
                 st.warning("❌ Score not detected")
         else:
             st.error("Could not read frame")
-
-# ----------------------------
-# SIDEBAR: ADD NEW DATA
-# ----------------------------
-st.sidebar.header("➕ Add GPS Session")
-with st.sidebar.form("update_form"):
-    date = st.text_input("Date (YYYY-MM-DD)")
-    opposition = st.text_input("Opponent")
-    distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
-    accel_decel = st.number_input("Accelerations/Decelerations", min_value=0, step=1)
-    submit = st.form_submit_button("Update")
-    if submit:
-        new_row = {"date": date, "opposition_full": opposition, "distance": distance, "accel_decel_over_2_5": accel_decel}
-        gps_data = gps_data.append(new_row, ignore_index=True)
-        gps_data.to_csv("CFC GPS Data.csv", index=False)
-        st.success("GPS data updated!")
-        st.rerun()
-st.sidebar.info("This dashboard transforms raw data into real-world coaching decisions.")
