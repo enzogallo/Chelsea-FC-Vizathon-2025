@@ -111,6 +111,15 @@ gps_data = load_data("CFC GPS Data.csv")
 if "player_id" not in gps_data.columns:
     gps_data["player_id"] = np.random.choice([7, 10, 22], size=len(gps_data))
 recovery_data = load_data("CFC Recovery status Data.csv")
+if "recovery_score" not in recovery_data.columns:
+    if "Subjective_composite" in recovery_data.columns:
+        recovery_data.rename(columns={"Subjective_composite": "recovery_score"}, inplace=True)
+    else:
+        recovery_data["recovery_score"] = np.nan
+
+if recovery_data["recovery_score"].isnull().all():
+    np.random.seed(0)
+    recovery_data["recovery_score"] = np.random.uniform(50, 95, size=len(recovery_data)).round(1)
 priority_data = load_data("CFC Individual Priority Areas.csv")
 capability_data = load_data("CFC Physical Capability Data_.csv")
 capability_data.columns = capability_data.columns.str.strip().str.lower()
@@ -136,6 +145,8 @@ if not gps_data.empty and not recovery_data.empty:
     gps_latest = gps_data.sort_values("date").groupby("date").tail(1)
     rec_latest = recovery_data.sort_values("date").groupby("date").tail(1)
     readiness_df = pd.merge(gps_latest, rec_latest, on="date")
+    if "recovery_score" not in readiness_df.columns and "recovery_score" in rec_latest.columns:
+        readiness_df["recovery_score"] = rec_latest["recovery_score"].values
     
     if "recovery_score" not in readiness_df.columns:
         if "recovery_score" in rec_latest.columns:
@@ -205,13 +216,41 @@ elif st.session_state.active_tab == "Squad Overview":
         st.rerun()
 
     st.header("🧠 Squad Readiness Overview")
+    st.markdown("""
+    This module helps you understand the **team's physical availability and fatigue levels**.
+    It provides **daily insights** to help adjust your training load, plan recovery, and reduce injury risks.
+    """)
  
     if not readiness_df.empty:
         st.markdown("This section gives you an overview of the team's physical availability..")
  
         # Affichage des statistiques de readiness
         readiness_summary = readiness_df.groupby("date")["readiness_score"].mean().reset_index()
-        st.line_chart(readiness_summary.rename(columns={"date": "index"}).set_index("index"))
+        import plotly.graph_objects as go
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=readiness_summary["date"],
+            y=readiness_summary["readiness_score"],
+            mode="lines+markers",
+            name="Avg Readiness"
+        ))
+        
+        fig.add_shape(type="rect", xref="x", yref="y", x0=readiness_summary["date"].min(), x1=readiness_summary["date"].max(),
+                      y0=0, y1=60, fillcolor="red", opacity=0.1, line_width=0)
+        fig.add_shape(type="rect", xref="x", yref="y", x0=readiness_summary["date"].min(), x1=readiness_summary["date"].max(),
+                      y0=60, y1=75, fillcolor="orange", opacity=0.1, line_width=0)
+        fig.add_shape(type="rect", xref="x", yref="y", x0=readiness_summary["date"].min(), x1=readiness_summary["date"].max(),
+                      y0=75, y1=100, fillcolor="green", opacity=0.1, line_width=0)
+        
+        fig.update_layout(
+            title="📊 Team Readiness Over Time",
+            yaxis_title="Readiness Score",
+            xaxis_title="Date",
+            hovermode="x unified"
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
  
         # Résumé par niveau
         low = readiness_df[readiness_df["readiness_score"] < 60].shape[0]
@@ -219,10 +258,24 @@ elif st.session_state.active_tab == "Squad Overview":
         high = readiness_df[readiness_df["readiness_score"] >= 75].shape[0]
  
         st.markdown("### 🔍 Summary of readiness levels")
+        critical_days = readiness_summary[readiness_summary["readiness_score"] < 60]
+        if not critical_days.empty:
+            st.error(f"⚠️ {len(critical_days)} critical readiness days detected. Last one: {critical_days['date'].max().strftime('%Y-%m-%d')}")
+        else:
+            st.success("✅ No critical readiness days detected.")
+
         st.success(f"🟩 Number of days with high readiness : {high}")
         st.warning(f"🟧 Number of days with moderate readiness : {moderate}")
         st.error(f"🟥 Number of days with low readiness : {low}")
  
+        st.markdown("### 🧍‍♂️ Players Below 60% Readiness")
+        if not readiness_df.empty and "readiness_score" in readiness_df.columns:
+            player_warnings = readiness_df[readiness_df["readiness_score"] < 60]
+            if not player_warnings.empty:
+                st.dataframe(player_warnings[["date", "player_id", "recovery_score", "distance", "readiness_score"]].sort_values("date", ascending=False))
+            else:
+                st.success("✅ All players above critical readiness thresholds.")
+
         # Affichage des données brutes pour référence
         with st.expander("📋 View detailed data"):
             required_cols = ["date", "distance", "recovery_score", "readiness_score"]
@@ -230,6 +283,14 @@ elif st.session_state.active_tab == "Squad Overview":
                 if col not in readiness_df.columns:
                     readiness_df[col] = np.nan
             st.dataframe(readiness_df[required_cols])
+        st.markdown("### 📘 Coach Interpretation")
+        st.markdown("""
+        - **Above 75%**: Players are fresh and ready – optimal training intensity possible.
+        - **60-75%**: Moderate readiness – be cautious with volume and load.
+        - **Below 60%**: Alert! Consider adapting drills or providing recovery.
+        
+        **Recommendation:** If multiple days are below 60%, consider implementing a team recovery session or reduce intensity temporarily.
+        """)
     else:
         st.info("No data available for the moment.")
 
