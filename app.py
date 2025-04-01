@@ -134,6 +134,27 @@ for df in [gps_data, recovery_data, capability_data]:
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
 # ----------------------------
+# === Global Player Filter ===
+st.sidebar.header("🎯 Player Filter")
+all_players = sorted(gps_data["player_id"].dropna().unique())
+selected_player = st.sidebar.selectbox("Select a player to filter all modules", options=["All"] + list(map(str, all_players)))
+
+if selected_player != "All":
+    selected_player = int(selected_player)
+
+if selected_player != "All":
+    gps_data = gps_data[gps_data["player_id"] == selected_player]
+      
+    if "player_id" in recovery_data.columns:
+        recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
+
+    if "player name" in capability_data.columns:
+        capability_data = capability_data[capability_data["player name"] == str(selected_player)]
+
+    if "Player Name" in priority_data.columns:
+        priority_data = priority_data[priority_data["Player Name"] == str(selected_player)]
+
+# ----------------------------
 # READINESS SCORE
 # ----------------------------
 def calculate_readiness(row):
@@ -216,6 +237,8 @@ elif st.session_state.active_tab == "Squad Overview":
         st.rerun()
 
     st.header("🧠 Squad Readiness Overview")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.markdown("""
     This module helps you understand the **team's physical availability and fatigue levels**.
     It provides **daily insights** to help adjust your training load, plan recovery, and reduce injury risks.
@@ -300,6 +323,8 @@ elif st.session_state.active_tab == "Load Demand":
         st.rerun()
 
     st.header("📈 Match Load Analysis")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     player_list = gps_data["player_id"].dropna().unique()
     selected_player = st.selectbox("Select Player for Individual View", player_list)
     player_data = gps_data[gps_data["player_id"] == selected_player]
@@ -373,6 +398,8 @@ elif st.session_state.active_tab == "Recovery":
         st.rerun()
 
     st.header("🛌 Recovery Overview")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.subheader("📊 Daily Team Recovery Summary")
     if "recovery_score" in recovery_data.columns:
         daily_avg = recovery_data.groupby("date")["recovery_score"].mean().reset_index()
@@ -417,6 +444,8 @@ elif st.session_state.active_tab == "Physical Development":
         st.rerun()
 
     st.header("🏋️ Physical Test Results")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     if not capability_data.empty:
         st.markdown("Cette section vous permet d'évaluer les capacités physiques des joueurs par rapport à des benchmarks de référence.")
 
@@ -495,6 +524,8 @@ elif st.session_state.active_tab == "Biography":
         st.rerun()
 
     st.header("📇 Player Profile & Individual Objectives")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.markdown("This section provides an overview of the individual objectives set for players and their achievement status..")
 
     if not priority_data.empty:
@@ -517,6 +548,8 @@ elif st.session_state.active_tab == "Injury":
         st.rerun()
 
     st.header("❌ Injury & Medical Overview")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.markdown("Tracking injuries and analyzing availability trends.")
 
     if not recovery_data.empty:
@@ -543,6 +576,8 @@ elif st.session_state.active_tab == "External Factors":
         st.rerun()
 
     st.header("🌍 External Context")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.markdown("Capture external influences like fatigue, travel, or psychological state that might impact performance.")
 
     with st.form("external_note_form"):
@@ -577,6 +612,8 @@ elif st.session_state.active_tab == "Match Analysis":
         st.rerun()
 
     st.header("📍 Player Heatmap")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     df = pd.DataFrame({
         "player_id": np.random.choice([7, 10, 22], 300),
         "x": np.random.normal(52.5, 20, 300),
@@ -621,6 +658,8 @@ elif st.session_state.active_tab == "Video Analysis":
         st.rerun()
 
     st.header("🎥 Video Stat Detection")
+    if selected_player != "All":
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     video_file = st.file_uploader("Upload match video", type=["mp4"])
     if video_file:
         tmp = tempfile.NamedTemporaryFile(delete=False)
