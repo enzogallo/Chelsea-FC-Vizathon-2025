@@ -130,13 +130,30 @@ gps_data = load_data("CFC GPS Data.csv")
 if "player_id" not in gps_data.columns:
     gps_data["player_id"] = np.random.choice([7, 10, 22], size=len(gps_data))
 recovery_data = load_data("CFC Recovery status Data.csv")
-if "injury_status" not in recovery_data.columns:
+if "injury_status" not in recovery_data.columns or recovery_data["injury_status"].nunique() <= 1:
+    injury_entries = []
     np.random.seed(42)
-    recovery_data["injury_status"] = np.random.choice(
-        ["None", "Hamstring", "Knee", "Ankle", "Fatigue"],
-        size=len(recovery_data),
-        p=[0.7, 0.1, 0.08, 0.07, 0.05]
-    )
+    injury_types = ["Hamstring", "Knee", "Ankle", "Fatigue"]
+    player_ids = [7, 10, 22]
+
+    for player in player_ids:
+        n_injuries = np.random.randint(2, 4)  # max 3 blessures
+        injury_dates = pd.date_range(end=datetime.today(), periods=365).to_series().sample(n=n_injuries).sort_values()
+        for date in injury_dates:
+            injury_entries.append({
+                "player_id": player,
+                "date": date,
+                "injury_status": np.random.choice(injury_types)
+            })
+
+    injury_df = pd.DataFrame(injury_entries)
+    recovery_data = recovery_data.drop(columns=["injury_status"], errors="ignore")
+    recovery_data["date"] = pd.to_datetime(recovery_data["date"])
+    injury_df["date"] = pd.to_datetime(injury_df["date"])
+    recovery_data["date"] = pd.to_datetime(recovery_data["date"]).dt.date
+    injury_df["date"] = pd.to_datetime(injury_df["date"]).dt.date
+    recovery_data = pd.merge(recovery_data, injury_df, on=["player_id", "date"], how="left")
+    recovery_data["injury_status"] = recovery_data["injury_status"].fillna("None")
 if "player_id" not in recovery_data.columns:
     recovery_data["player_id"] = np.random.choice([7, 10, 22], size=len(recovery_data))
 if "recovery_score" not in recovery_data.columns:
@@ -273,6 +290,31 @@ if not gps_data.empty and not recovery_data.empty:
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(200, 10, "Event Map by Type", ln=True, align="C")
         pdf.image(tmp_img2.name, x=30, y=140, w=150)  # décale aussi la 2e image
+        
+        import plotly.express as px
+        from plotly.io import to_image
+        
+        timeline_fig = px.scatter(
+            filtered_events,
+            x="timestamp",
+            y="event_type",
+            color="event_type",
+            hover_data=["timestamp", "x", "y"],
+            title=f"Event Timeline – Player {player_id}",
+            labels={"timestamp": "Time", "event_type": "Event Type"}
+        )
+        timeline_fig.update_layout(height=400)
+        
+        tmp_img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        img_bytes = to_image(timeline_fig, format="png", width=800, height=400)
+        with open(tmp_img3.name, "wb") as f:
+            f.write(img_bytes)
+        
+        pdf.ln(100)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(200, 10, "Timeline of Match Events", ln=True, align="C")
+        pdf.image(tmp_img3.name, x=30, y=230, w=150)
+        
         return pdf.output(dest="S").encode("latin1")
 else:
     readiness_df = pd.DataFrame()
@@ -794,20 +836,37 @@ elif st.session_state.active_tab == "Injury":
     if not recovery_data.empty:
         if "injury_status" in recovery_data.columns:
             st.subheader("📊 Injury status")
-            fig_injury = px.histogram(recovery_data, x="injury_status", title="Breakdown of injuries")
-            st.plotly_chart(fig_injury, use_container_width=True)
+            recovery_data["injury_status"] = recovery_data["injury_status"].fillna("None").astype(str)
+            filtered_injuries = recovery_data[
+                recovery_data["injury_status"].str.strip().str.lower().ne("none") &
+                recovery_data["injury_status"].notna()
+            ]
+            if not filtered_injuries.empty:
+                st.success(f"✅ {len(filtered_injuries)} injuries detected in the dataset.")
+                fig_injury = px.histogram(filtered_injuries, x="injury_status", title="Breakdown of injuries")
+                st.plotly_chart(fig_injury, use_container_width=True)
+            else:
+                st.info("✅ No injuries currently detected for the selected timeframe.")
 
-            st.subheader("📅 Timeline des Blessures")
-            injury_timeline = recovery_data[recovery_data["injury_status"] != "None"]
+            st.subheader("📅 Injury Timeline")
+            injury_timeline = recovery_data[
+                recovery_data["injury_status"].str.strip().str.lower().ne("none") &
+                recovery_data["injury_status"].notna()
+            ]
             if not injury_timeline.empty:
                 fig_timeline = px.scatter(injury_timeline, x="date", y="injury_status", color="injury_status", title="Injury history")
                 st.plotly_chart(fig_timeline, use_container_width=True)
             else:
-                st.info("No injuries reported recently.")
+                st.warning("ℹ️ No confirmed injuries found in the dataset.")
         else:
             st.warning("No 'injury_status' column detected. Injury data unavailable.")
     else:
         st.info("No recovery or injury data available.")
+
+    st.caption("📌 Debug: Injury dates range from {} to {}".format(
+        recovery_data['date'].min().strftime('%Y-%m-%d'),
+        recovery_data['date'].max().strftime('%Y-%m-%d')
+    ))
     
 elif st.session_state.active_tab == "External Factors":
     if st.button("⬅️ Back to Home", key="back_home_external"):
@@ -963,38 +1022,130 @@ elif st.session_state.active_tab == "Match Analysis":
     ax2.legend(handles=legend_elements, title="Event Type", loc="upper right", fontsize="small", title_fontsize="small")
     st.pyplot(fig2)
 
-    st.subheader("📋 Event Table")
-    st.dataframe(filtered_events.sort_values("timestamp"))
+    st.subheader("🕒 Match Replay Timeline")
+    st.markdown("Animated replay of key events over time for a selected match and player.")
+
+    event_data = pd.read_csv("CFC Match Events Data.csv")
+    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
+
+    if not event_data.empty:
+        event_data["match_date"] = event_data["timestamp"].dt.date
+        match_dates = sorted(event_data["match_date"].unique())
+        selected_match = st.selectbox("Select Match Date", options=match_dates)
+
+        match_events = event_data[event_data["match_date"] == selected_match]
+
+        match_players = sorted(match_events["player_id"].dropna().unique())
+        selected_player_replay = st.selectbox("Select Player for Timeline Replay", options=match_players)
+
+        player_events = match_events[match_events["player_id"] == selected_player_replay]
+
+        if not player_events.empty:
+            player_events = player_events.sort_values("timestamp")
+            player_events["time"] = player_events["timestamp"].dt.strftime("%H:%M:%S")
+
+            import plotly.express as px
+            available_event_types = sorted(player_events["event_type"].unique())
+            selected_event_types = st.multiselect("Filter by Event Type", available_event_types, default=available_event_types)
+            if not selected_event_types:
+                st.warning("Please select at least one event type to display the timeline.")
+            else:
+                # Filter the data accordingly with the selected types
+                player_events = player_events[player_events["event_type"].isin(selected_event_types)]
+
+                fig_timeline = px.scatter(
+                    player_events,
+                    x="timestamp",
+                    y="event_type",
+                    color="event_type",
+                    hover_data=["timestamp", "x", "y"],
+                    title=f"📊 Event Timeline – Player {selected_player_replay}",
+                    labels={"timestamp": "Time", "event_type": "Event Type"}
+                )
+                fig_timeline.update_layout(
+                    height=500,
+                    yaxis_title="Event Type",
+                    xaxis_title="Timestamp",
+                    showlegend=True
+                )
+                st.plotly_chart(fig_timeline, use_container_width=True)
+        else:
+            st.warning("No events found for this player in the selected match.")
+    else:
+        st.info("No match data available for replay.")
 
     if st.button("Download Player Report"):
         report = generate_player_report(selected_player, filtered_events, color_palette)
         st.download_button("Download PDF", data=report, file_name=f"player_{selected_player}_report.pdf", mime="application/pdf")
     
 elif st.session_state.active_tab == "Video Analysis":
-    if st.button("⬅️ Back to Home", key="back_home_video"):
+    if st.button("⬅️ Back to Home", key="back_home_photo"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
-    st.header("🎥 Video Stat Detection")
-    if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
-    video_file = st.file_uploader("Upload match video", type=["mp4"])
-    if video_file:
-        tmp = tempfile.NamedTemporaryFile(delete=False)
-        tmp.write(video_file.read())
-        cap = cv2.VideoCapture(tmp.name)
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) // 2)
-        ret, frame = cap.read()
-        cap.release()
-        if ret:
-            st.image(frame, channels="BGR", caption="Frame for OCR")
-            reader = easyocr.Reader(['en'])
-            result = reader.readtext(frame)
-            score_text = " ".join([text[1] for text in result if any(char.isdigit() for char in text[1])])
-            if score_text:
-                st.success(f"🎯 Detected Score: {score_text}")
+    st.header("📸 Photo Analysis – Player Position Detection")
+
+    st.markdown("""
+    Upload a photo from a football match, and this module will detect the **players' positions** and project them onto a virtual pitch.
+    Ideal for quick tactical snapshots from game footage or training sessions.
+
+    ℹ️ Best results with **aerial or broadcast-style match photos**.
+    """)
+
+    image_file = st.file_uploader("Upload Match Image", type=["jpg", "jpeg", "png"])
+
+    if image_file:
+        import torch
+        from PIL import Image
+        from ultralytics import YOLO
+
+        try:
+            image = Image.open(image_file).convert("RGB")
+            st.image(image, caption="Uploaded Match Image", use_column_width=True)
+
+            # Load YOLOv8 pretrained model
+            model = YOLO("yolov8n.pt")  # lightweight model for people detection
+
+            # Run detection
+            results = model.predict(image, classes=[0], conf=0.5)  # class 0 = person
+
+            boxes = results[0].boxes.xywh.cpu().numpy()  # Get boxes [x, y, w, h]
+            # Get the original image as array
+            image_np = np.array(image)
+            
+            # Get box xywh and xyxy coordinates
+            boxes_xyxy = results[0].boxes.xyxy.cpu().numpy()
+            team_colors = []
+            
+            for i, (x1, y1, x2, y2) in enumerate(boxes_xyxy):
+                x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+                cropped = image_np[y1:y2, x1:x2]
+                if cropped.size == 0:
+                    team_colors.append((0, 0, 0))
+                    continue
+                avg_color = cropped.mean(axis=(0, 1))  # RGB
+                team_colors.append(avg_color)
+            
+            # Simple KMeans to cluster 2 teams by jersey color
+            from sklearn.cluster import KMeans
+            kmeans = KMeans(n_clusters=2, n_init="auto").fit(team_colors)
+            team_labels = kmeans.labels_
+            if len(boxes) == 0:
+                st.error("❌ No players detected. Please try with a clearer match photo.")
             else:
-                st.warning("❌ Score not detected")
-        else:
-            st.error("Could not read frame")
+                fig, ax = plt.subplots(figsize=(8, 5))
+                pitch = Pitch(pitch_type='statsbomb', pitch_color='grass', line_color='white')
+                pitch.draw(ax=ax)
+
+                for i, box in enumerate(boxes):
+                    x, y, w, h = box
+                    # Map original image x, y roughly to pitch — here simplistically scaled to 105x68
+                    px = (x / image.width) * 105
+                    py = (y / image.height) * 68
+                    color = ['blue', 'red'][team_labels[i] % 2]
+                    ax.scatter(px, py, c=color, edgecolors='black', s=100, alpha=0.8)
+
+                st.pyplot(fig)
+        except Exception as e:
+            st.error("❌ The uploaded image could not be processed as a football pitch.\n\nMake sure it's a match photo from a clear angle.")
