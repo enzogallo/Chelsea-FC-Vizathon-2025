@@ -237,7 +237,7 @@ if not gps_data.empty and not recovery_data.empty:
 
     readiness_df["readiness_score"] = readiness_df.apply(calculate_readiness, axis=1)
 
-    def generate_player_report(player_id):
+    def generate_player_report(player_id, filtered_events, color_palette):
         fig, ax = plt.subplots(figsize=(6, 4))
         pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
         pitch.draw(ax=ax)
@@ -248,13 +248,31 @@ if not gps_data.empty and not recovery_data.empty:
         fig.savefig(tmp_img.name)
         plt.close(fig)
 
+        fig2, ax2 = plt.subplots(figsize=(6, 4))
+        pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+        pitch.draw(ax=ax2)
+
+        for i, etype in enumerate(filtered_events["event_type"].unique()):
+            sub = filtered_events[filtered_events["event_type"] == etype]
+            color = color_palette[i % len(color_palette)]
+            ax2.scatter(sub["x"], sub["y"], label=etype, c=color, alpha=0.6, edgecolors="black")
+
+        ax2.legend()
+        tmp_img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig2.savefig(tmp_img2.name)
+        plt.close(fig2)
+
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", 'B', 14)
         pdf.cell(200, 10, f"Player {player_id} Heatmap Report", ln=True, align="C")
         pdf.set_font("Arial", '', 12)
         pdf.cell(200, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True, align="C")
-        pdf.image(tmp_img.name, x=30, y=60, w=150)
+        pdf.image(tmp_img.name, x=30, y=40, w=150)  # baisse la position Y pour éviter la coupe
+        pdf.ln(120)  # ajoute plus d'espace avant la deuxième image
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(200, 10, "Event Map by Type", ln=True, align="C")
+        pdf.image(tmp_img2.name, x=30, y=140, w=150)  # décale aussi la 2e image
         return pdf.output(dest="S").encode("latin1")
 else:
     readiness_df = pd.DataFrame()
@@ -941,8 +959,8 @@ elif st.session_state.active_tab == "Match Analysis":
     st.dataframe(filtered_events.sort_values("timestamp"))
 
     if st.button("Download Player Report"):
-        report = generate_player_report(selected)
-        st.download_button("Download PDF", data=report, file_name=f"player_{selected}_report.pdf", mime="application/pdf")
+        report = generate_player_report(selected_player, filtered_events, color_palette)
+        st.download_button("Download PDF", data=report, file_name=f"player_{selected_player}_report.pdf", mime="application/pdf")
     
 elif st.session_state.active_tab == "Video Analysis":
     if st.button("⬅️ Back to Home", key="back_home_video"):
