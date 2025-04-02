@@ -58,7 +58,7 @@ def render_home():
                 # Affichage image
                 st.markdown(f"""
                 <img src="data:image/png;base64,{encoded}" 
-                         style="width:100%; height:200px; object-fit:cover; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:0.5rem;" />
+                         style="width:100%; height:300px; object-fit:cover; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:0.5rem;" />
                 """, unsafe_allow_html=True)
 
                 # Bouton avec clé unique (ajout d'un préfixe)
@@ -410,28 +410,28 @@ elif st.session_state.active_tab == "Load Demand":
 
     st.header("📈 Match Load Analysis")
 
-    st.subheader("➕ Add Training Load Entry")
-    with st.form("add_training_load_form"):
-        ld_date = st.date_input("📅 Date", value=datetime.today(), key="ld_date")
-        ld_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="ld_player")
-        ld_distance = st.number_input("🏃 Distance (m)", min_value=0, value=5000, step=100, key="ld_distance")
-        ld_oppo = st.text_input("🏟️ Opponent (optional)", key="ld_oppo")
-        ld_accel = st.number_input("⚡ Accel/Decel (>2.5 m/s²)", min_value=0, step=1, value=12, key="ld_accel")
-        submit_ld = st.form_submit_button("Add Load Entry")
-        if submit_ld:
-            new_entry = {
-                "date": ld_date,
-                "player_id": ld_player,
-                "distance": ld_distance,
-                "opposition_full": ld_oppo,
-                "accel_decel_over_2_5": ld_accel
-            }
-            gps_path = "CFC GPS Data.csv"
-            existing_gps = pd.read_csv(gps_path) if os.path.exists(gps_path) else pd.DataFrame()
-            updated_gps = pd.concat([existing_gps, pd.DataFrame([new_entry])], ignore_index=True)
-            updated_gps.to_csv(gps_path, index=False)
-            st.success("✅ Training load entry added successfully.")
-            st.rerun()
+    with st.sidebar.expander("➕ Add Training Load Entry"):
+        with st.form("add_training_load_form"):
+            ld_date = st.date_input("📅 Date", value=datetime.today(), key="ld_date")
+            ld_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="ld_player")
+            ld_distance = st.number_input("🏃 Distance (m)", min_value=0, value=5000, step=100, key="ld_distance")
+            ld_oppo = st.text_input("🏟️ Opponent (optional)", key="ld_oppo")
+            ld_accel = st.number_input("⚡ Accel/Decel (>2.5 m/s²)", min_value=0, step=1, value=12, key="ld_accel")
+            submit_ld = st.form_submit_button("Add Load Entry")
+            if submit_ld:
+                new_entry = {
+                    "date": ld_date,
+                    "player_id": ld_player,
+                    "distance": ld_distance,
+                    "opposition_full": ld_oppo,
+                    "accel_decel_over_2_5": ld_accel
+                }
+                gps_path = "CFC GPS Data.csv"
+                existing_gps = pd.read_csv(gps_path) if os.path.exists(gps_path) else pd.DataFrame()
+                updated_gps = pd.concat([existing_gps, pd.DataFrame([new_entry])], ignore_index=True)
+                updated_gps.to_csv(gps_path, index=False)
+                st.success("✅ Training load entry added successfully.")
+                st.rerun()
 
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -518,26 +518,26 @@ elif st.session_state.active_tab == "Recovery":
     """)
 
     # ➕ Add Recovery Entry Form
-    st.subheader("➕ Add Recovery Entry")
-    with st.form("add_recovery_entry_form"):
-        rec_date = st.date_input("📅 Recovery Date", value=datetime.today(), key="rec_date")
-        rec_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="rec_player")
-        rec_score = st.slider("🧪 Recovery Score (0-100)", min_value=0, max_value=100, value=75, key="rec_score")
-        rec_note = st.text_area("📝 Optional Notes", key="rec_note")
-        submit_recovery = st.form_submit_button("Add Recovery Entry")
-        if submit_recovery:
-            new_entry = {
-                "date": rec_date,
-                "player_id": rec_player,
-                "recovery_score": rec_score,
-                "note": rec_note
-            }
-            recovery_path = "CFC Recovery status Data.csv"
-            existing_recovery = pd.read_csv(recovery_path) if os.path.exists(recovery_path) else pd.DataFrame()
-            updated_recovery = pd.concat([existing_recovery, pd.DataFrame([new_entry])], ignore_index=True)
-            updated_recovery.to_csv(recovery_path, index=False)
-            st.success(f"✅ Recovery entry added for {PLAYER_NAMES.get(rec_player)} with score {rec_score}")
-            st.rerun()
+    with st.sidebar.expander("➕ Add Recovery Entry"):
+        with st.form("add_recovery_entry_form"):
+            rec_date = st.date_input("📅 Recovery Date", value=datetime.today(), key="rec_date")
+            rec_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="rec_player")
+            rec_score = st.slider("🧪 Recovery Score (0-100)", min_value=0, max_value=100, value=75, key="rec_score")
+            rec_note = st.text_area("📝 Optional Notes", key="rec_note")
+            submit_recovery = st.form_submit_button("Add Recovery Entry")
+            if submit_recovery:
+                new_entry = {
+                    "date": rec_date,
+                    "player_id": rec_player,
+                    "recovery_score": rec_score,
+                    "note": rec_note
+                }
+                recovery_path = "CFC Recovery status Data.csv"
+                existing_recovery = pd.read_csv(recovery_path) if os.path.exists(recovery_path) else pd.DataFrame()
+                updated_recovery = pd.concat([existing_recovery, pd.DataFrame([new_entry])], ignore_index=True)
+                updated_recovery.to_csv(recovery_path, index=False)
+                st.success(f"✅ Recovery entry added for {PLAYER_NAMES.get(rec_player)} with score {rec_score}")
+                st.rerun()
 
     # ---- Recovery Visuals ----
     if not recovery_data.empty:
@@ -736,24 +736,24 @@ elif st.session_state.active_tab == "Biography":
 
     st.header("📇 Player Profile & Individual Objectives")
 
-    st.subheader("➕ Add Individual Goal")
-    with st.form("add_goal_form"):
-        bio_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="bio_player")
-        goal_desc = st.text_input("🎯 Goal Description", key="goal_desc")
-        goal_status = st.selectbox("📈 Tracking Status", ["In Progress", "Achieved", "Not Started"], key="goal_status")
-        submit_goal = st.form_submit_button("Add Goal")
-        if submit_goal:
-            new_entry = {
-                "Player Name": str(bio_player),
-                "Individual Goals": goal_desc,
-                "Tracking": goal_status
-            }
-            goals_path = "CFC Individual Priority Areas.csv"
-            existing_goals = pd.read_csv(goals_path) if os.path.exists(goals_path) else pd.DataFrame()
-            updated_goals = pd.concat([existing_goals, pd.DataFrame([new_entry])], ignore_index=True)
-            updated_goals.to_csv(goals_path, index=False)
-            st.success("✅ Goal added successfully.")
-            st.rerun()
+    with st.sidebar.expander("➕ Add Individual Goal"):
+        with st.form("add_goal_form"):
+            bio_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="bio_player")
+            goal_desc = st.text_input("🎯 Goal Description", key="goal_desc")
+            goal_status = st.selectbox("📈 Tracking Status", ["In Progress", "Achieved", "Not Started"], key="goal_status")
+            submit_goal = st.form_submit_button("Add Goal")
+            if submit_goal:
+                new_entry = {
+                    "Player Name": str(bio_player),
+                    "Individual Goals": goal_desc,
+                    "Tracking": goal_status
+                }
+                goals_path = "CFC Individual Priority Areas.csv"
+                existing_goals = pd.read_csv(goals_path) if os.path.exists(goals_path) else pd.DataFrame()
+                updated_goals = pd.concat([existing_goals, pd.DataFrame([new_entry])], ignore_index=True)
+                updated_goals.to_csv(goals_path, index=False)
+                st.success("✅ Goal added successfully.")
+                st.rerun()
 
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -813,24 +813,25 @@ elif st.session_state.active_tab == "External Factors":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.markdown("Capture external influences like fatigue, travel, or psychological state that might impact performance.")
 
-    with st.form("external_note_form"):
-        note_date = st.date_input("📅 Date concerned", value=datetime.now())
-        player_options = ["Whole Team"] + [str(pid) for pid in sorted(gps_data["player_id"].dropna().unique())]
-        selected_player = st.selectbox("👤 Player concerned", options=player_options)
-        factor_type = st.selectbox("📌 Type of factor", ["Fatigue", "Travel", "Motivation", "Mental", "Weather", "Other"])
-        note_text = st.text_area("📝 Coach's Note")
-        submitted = st.form_submit_button("Save Note")
+    with st.sidebar.expander("➕ Add External Note"):
+        with st.form("external_note_form"):
+            note_date = st.date_input("📅 Date concerned", value=datetime.now())
+            player_options = ["Whole Team"] + [str(pid) for pid in sorted(gps_data["player_id"].dropna().unique())]
+            selected_player = st.selectbox("👤 Player concerned", options=player_options)
+            factor_type = st.selectbox("📌 Type of factor", ["Fatigue", "Travel", "Motivation", "Mental", "Weather", "Other"])
+            note_text = st.text_area("📝 Coach's Note")
+            submitted = st.form_submit_button("Save Note")
 
-        if submitted and note_text.strip():
-            if "external_notes" not in st.session_state:
-                st.session_state.external_notes = []
-            st.session_state.external_notes.append({
-                "date": note_date,
-                "player": selected_player,
-                "type": factor_type,
-                "note": note_text.strip()
-            })
-            st.success("✅ Note saved!")
+            if submitted and note_text.strip():
+                if "external_notes" not in st.session_state:
+                    st.session_state.external_notes = []
+                st.session_state.external_notes.append({
+                    "date": note_date,
+                    "player": selected_player,
+                    "type": factor_type,
+                    "note": note_text.strip()
+                })
+                st.success("✅ Note saved!")
 
     if "external_notes" in st.session_state and st.session_state.external_notes:
         st.markdown("### 📋 Coach Notes Summary")
@@ -847,42 +848,42 @@ elif st.session_state.active_tab == "Match Analysis":
 
     st.header("📍 Player Heatmap")
 
-    st.subheader("➕ Add Match Event")
-    with st.form("add_match_event_form"):
-        match_date = st.date_input("📅 Match Date", value=datetime.today())
-        match_time = st.time_input("⏱️ Match Time", value=datetime.now().time())
-        event_timestamp = datetime.combine(match_date, match_time)
+    with st.sidebar.expander("➕ Add Match Event"):
+        with st.form("add_match_event_form"):
+            match_date = st.date_input("📅 Match Date", value=datetime.today())
+            match_time = st.time_input("⏱️ Match Time", value=datetime.now().time())
+            event_timestamp = datetime.combine(match_date, match_time)
 
-        player_ids = sorted(gps_data["player_id"].dropna().unique())
-        event_player = st.selectbox("👤 Player Involved", options=player_ids)
-        event_type = st.selectbox("⚽ Event Type", options=["Pass", "Shot", "Dribble", "Tackle", "Interception", "Foul", "Save", "Clearance", "Cross", "Duel"])
+            player_ids = sorted(gps_data["player_id"].dropna().unique())
+            event_player = st.selectbox("👤 Player Involved", options=player_ids)
+            event_type = st.selectbox("⚽ Event Type", options=["Pass", "Shot", "Dribble", "Tackle", "Interception", "Foul", "Save", "Clearance", "Cross", "Duel"])
 
-        x_coord = st.slider("📍 X Position on Field (0 = Left, 105 = Right)", min_value=0.0, max_value=105.0, value=52.5)
-        y_coord = st.slider("📍 Y Position on Field (0 = Bottom, 68 = Top)", min_value=0.0, max_value=68.0, value=34.0)
+            x_coord = st.slider("📍 X Position on Field (0 = Left, 105 = Right)", min_value=0.0, max_value=105.0, value=52.5)
+            y_coord = st.slider("📍 Y Position on Field (0 = Bottom, 68 = Top)", min_value=0.0, max_value=68.0, value=34.0)
 
-        tags = st.text_input("🏷️ Tags (comma-separated)", help="Use tags like 'dangerous, counter-attack, assist' for better filtering.")
-        notes = st.text_area("📝 Additional Notes", help="Optional context for this event.")
+            tags = st.text_input("🏷️ Tags (comma-separated)", help="Use tags like 'dangerous, counter-attack, assist' for better filtering.")
+            notes = st.text_area("📝 Additional Notes", help="Optional context for this event.")
 
-        submitted_event = st.form_submit_button("Add Event to Match Dataset")
+            submitted_event = st.form_submit_button("Add Event to Match Dataset")
 
-        if submitted_event:
-            event_entry = {
-                "timestamp": event_timestamp,
-                "player_id": event_player,
-                "event_type": event_type,
-                "x": round(x_coord, 2),
-                "y": round(y_coord, 2),
-                "tags": tags,
-                "notes": notes
-            }
+            if submitted_event:
+                event_entry = {
+                    "timestamp": event_timestamp,
+                    "player_id": event_player,
+                    "event_type": event_type,
+                    "x": round(x_coord, 2),
+                    "y": round(y_coord, 2),
+                    "tags": tags,
+                    "notes": notes
+                }
 
-            events_path = "CFC Match Events Data.csv"
-            existing_events = pd.read_csv(events_path) if os.path.exists(events_path) else pd.DataFrame()
-            updated_events = pd.concat([existing_events, pd.DataFrame([event_entry])], ignore_index=True)
-            updated_events.to_csv(events_path, index=False)
+                events_path = "CFC Match Events Data.csv"
+                existing_events = pd.read_csv(events_path) if os.path.exists(events_path) else pd.DataFrame()
+                updated_events = pd.concat([existing_events, pd.DataFrame([event_entry])], ignore_index=True)
+                updated_events.to_csv(events_path, index=False)
 
-            st.success("✅ Match event successfully added.")
-            st.rerun()
+                st.success("✅ Match event successfully added.")
+                st.rerun()
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.subheader("📍 Heatmap of Match Involvement")
