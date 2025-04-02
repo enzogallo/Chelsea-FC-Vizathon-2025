@@ -44,7 +44,7 @@ def render_home():
         {"label": "Biography", "icon": "📇", "tab": "Biography"},
         {"label": "Injury", "icon": "❌", "tab": "Injury"},
         {"label": "External Factors", "icon": "🌍", "tab": "External Factors"},
-        {"label": "Video Analysis", "icon": "🎥", "tab": "Video Analysis"},
+        {"label": "Sprint & High Intensity", "icon": "⚡", "tab": "Sprint & High Intensity Zones"},
     ]
 
     for i, card in enumerate(cards):
@@ -109,12 +109,56 @@ def show_spinner():
     st.markdown(spinner_html, unsafe_allow_html=True)
     time.sleep(0.8)
 
+def simulate_realistic_gps_data(n_players=3, days=3, points_per_day=100):
+    np.random.seed(42)
+    data = []
+    player_ids = [7, 10, 22][:n_players]
+    start_date = datetime.today() - timedelta(days=days)
+ 
+    for player in player_ids:
+        for day in range(days):
+            base_time = datetime.combine(start_date + timedelta(days=day), datetime.min.time())
+            x, y = np.random.uniform(0, 105), np.random.uniform(0, 68)
+            vx, vy = 0, 0
+ 
+            for i in range(points_per_day):
+                timestamp = base_time + timedelta(seconds=i)
+ 
+                # Inject some random high acceleration every 20 steps
+                if i % 20 == 0:
+                    ax = np.random.uniform(-5, 5)  # simulate sudden change
+                    ay = np.random.uniform(-5, 5)
+                else:
+                    ax = np.random.normal(0, 0.5)
+                    ay = np.random.normal(0, 0.5)
+ 
+                vx += ax
+                vy += ay
+ 
+                # Apply velocity to position
+                x += vx * 0.2
+                y += vy * 0.2
+ 
+                # Clamp to pitch bounds
+                x = np.clip(x, 0, 105)
+                y = np.clip(y, 0, 68)
+ 
+                data.append({
+                    "player_id": player,
+                    "timestamp": timestamp,
+                    "x": x,
+                    "y": y,
+                    "date": timestamp.date()
+                })
+ 
+    return pd.DataFrame(data)
+
 st.markdown("""
 <div style="background-color:#034694; padding:2rem 2rem; border-radius:1rem; color:white; text-align:center; margin-bottom:3rem;">
     <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:85px; margin-bottom:1rem;" />
     <h1 style="margin:0; font-size:2.6rem;">Chelsea FC Vizathon Dashboard</h1>
-    <p style="margin-top:0.8rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
-        Designed for elite coaches: actionable insights, no data science degree required.
+    <p style="margin-top:0.1rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
+        Designed for elite coaches © Enzo Gallo 2025
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -127,8 +171,11 @@ def load_data(path):
     return pd.read_csv(path, encoding="ISO-8859-1") if os.path.exists(path) else pd.DataFrame()
 
 gps_data = load_data("CFC GPS Data.csv")
-if "player_id" not in gps_data.columns:
-    gps_data["player_id"] = np.random.choice([7, 10, 22], size=len(gps_data))
+# Inject mock GPS coordinates if missing
+if "x" not in gps_data.columns:
+    gps_data["x"] = np.random.uniform(0, 105, len(gps_data))
+if "y" not in gps_data.columns:
+    gps_data["y"] = np.random.uniform(0, 68, len(gps_data))
 recovery_data = load_data("CFC Recovery status Data.csv")
 if "injury_status" not in recovery_data.columns or recovery_data["injury_status"].nunique() <= 1:
     injury_entries = []
@@ -1135,74 +1182,59 @@ elif st.session_state.active_tab == "Match Analysis":
         report = generate_player_report(selected_player, filtered_events, color_palette)
         st.download_button("Download PDF", data=report, file_name=f"player_{selected_player}_report.pdf", mime="application/pdf")
     
-elif st.session_state.active_tab == "Video Analysis":
-    if st.button("⬅️ Back to Home", key="back_home_photo"):
+elif st.session_state.active_tab == "Sprint & High Intensity Zones":
+    if st.button("⬅️ Back to Home", key="back_home_sprint_top"):
         show_spinner()
         st.session_state.active_tab = "Home"
         st.rerun()
 
-    st.header("📸 Photo Analysis – Player Position Detection")
-
+    st.header("⚡ Sprint & High Intensity Summary")
     st.markdown("""
-    Upload a photo from a football match, and this module will detect the **players' positions** and project them onto a virtual pitch.
-    Ideal for quick tactical snapshots from game footage or training sessions.
+    This simplified module provides a quick view of how much high-intensity effort was produced by each player.
 
-    ℹ️ Best results with **aerial or broadcast-style match photos**.
+    - 🔢 **Effort Count**: Number of accelerations above the selected threshold  
+    - 📈 Useful to compare explosive activity across the squad  
     """)
 
-    image_file = st.file_uploader("Upload Match Image", type=["jpg", "jpeg", "png"])
+    accel_threshold = st.slider("Minimum acceleration threshold (m/s²)", 1.0, 5.0, 2.5, 0.1)
 
-    if image_file:
-        import torch
-        from PIL import Image
-        from ultralytics import YOLO
+    if gps_data.empty:
+        st.warning("No GPS data available.")
+    else:
+        if all(col in gps_data.columns for col in ["x", "y", "date"]):
+            gps_data = gps_data.copy()
 
-        try:
-            image = Image.open(image_file).convert("RGB")
-            st.image(image, caption="Uploaded Match Image", use_column_width=True)
+            # Simuler un timestamp si absent
+            if "timestamp" not in gps_data.columns or gps_data["date"].dt.hour.eq(0).all():
+                gps_data = gps_data.sort_values(["player_id", "date"])
+                gps_data["timestamp"] = gps_data.groupby("player_id").cumcount()
+                gps_data["timestamp"] = pd.to_datetime(gps_data["date"]) + pd.to_timedelta(gps_data["timestamp"], unit="s")
+            gps_data["timestamp"] = pd.to_datetime(gps_data["timestamp"])
 
-            # Load YOLOv8 pretrained model
-            model = YOLO("yolov8n.pt")  # lightweight model for people detection
+            gps_data["dx"] = gps_data.groupby("player_id")["x"].diff()
+            gps_data["dy"] = gps_data.groupby("player_id")["y"].diff()
+            gps_data["dt"] = gps_data.groupby("player_id")["timestamp"].diff().dt.total_seconds().fillna(1)
+            gps_data["vx"] = gps_data["dx"] / gps_data["dt"]
+            gps_data["vy"] = gps_data["dy"] / gps_data["dt"]
+            gps_data["speed"] = np.sqrt(gps_data["vx"]**2 + gps_data["vy"]**2)
+            gps_data["accel"] = gps_data.groupby("player_id")["speed"].diff() / gps_data["dt"]
 
-            # Run detection
-            results = model.predict(image, classes=[0], conf=0.5)  # class 0 = person
+            # Résumé des efforts
+            summary = (
+                gps_data[gps_data["accel"] >= accel_threshold]
+                .groupby("player_id")
+                .size()
+                .reset_index(name="high_intensity_count")
+            )
+            summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
 
-            boxes = results[0].boxes.xywh.cpu().numpy()  # Get boxes [x, y, w, h]
-            # Get the original image as array
-            image_np = np.array(image)
-            
-            # Get box xywh and xyxy coordinates
-            boxes_xyxy = results[0].boxes.xyxy.cpu().numpy()
-            team_colors = []
-            
-            for i, (x1, y1, x2, y2) in enumerate(boxes_xyxy):
-                x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
-                cropped = image_np[y1:y2, x1:x2]
-                if cropped.size == 0:
-                    team_colors.append((0, 0, 0))
-                    continue
-                avg_color = cropped.mean(axis=(0, 1))  # RGB
-                team_colors.append(avg_color)
-            
-            # Simple KMeans to cluster 2 teams by jersey color
-            from sklearn.cluster import KMeans
-            kmeans = KMeans(n_clusters=2, n_init="auto").fit(team_colors)
-            team_labels = kmeans.labels_
-            if len(boxes) == 0:
-                st.error("❌ No players detected. Please try with a clearer match photo.")
-            else:
-                fig, ax = plt.subplots(figsize=(8, 5))
-                pitch = Pitch(pitch_type='statsbomb', pitch_color='grass', line_color='white')
-                pitch.draw(ax=ax)
+            st.subheader("📊 High-Intensity Effort Count per Player")
+            st.dataframe(summary)
+        else:
+            st.warning("Missing required columns in GPS data.")
+    if st.button("⬅️ Back to Home", key="back_home_sprint_bottom"):
+        show_spinner()
+        st.session_state.active_tab = "Home"
+        st.rerun()
 
-                for i, box in enumerate(boxes):
-                    x, y, w, h = box
-                    # Map original image x, y roughly to pitch — here simplistically scaled to 105x68
-                    px = (x / image.width) * 105
-                    py = (y / image.height) * 68
-                    color = ['blue', 'red'][team_labels[i] % 2]
-                    ax.scatter(px, py, c=color, edgecolors='black', s=100, alpha=0.8)
-
-                st.pyplot(fig)
-        except Exception as e:
-            st.error("❌ The uploaded image could not be processed as a football pitch.\n\nMake sure it's a match photo from a clear angle.")
+   
