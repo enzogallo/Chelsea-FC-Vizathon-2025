@@ -897,25 +897,44 @@ elif st.session_state.active_tab == "Match Analysis":
     fig2, ax2 = plt.subplots(figsize=(5.5, 3.8))
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
     pitch.draw(ax=ax2)
-    color_palette = [c for c in px.colors.qualitative.Safe if c != "rgb(102,194,165)"]
+    color_palette = [mcolors.to_hex(tuple(int(x) / 255 for x in c.strip("rgb()").split(","))) for c in px.colors.qualitative.Safe]
+    if not color_palette:
+        color_palette = ['#1f77b4']  # Fallback color
+
+    success_marker_style = {
+    True: {"marker": "o", "facecolor": None},
+    False: {"marker": "x", "facecolor": "none"}
+    }
 
     for i, etype in enumerate(selected_types):
         subset = filtered_events[filtered_events["event_type"] == etype]
         color = color_palette[i % len(color_palette)]
+ 
+        for success_value in [True, False]:
+            sub = subset[subset["success"] == success_value]
+            
+            # Use circle for success, cross with unique color per stat for fail
+            marker = 'o' if success_value else 'X'
+            facecolor = color if success_value else 'none'
+            edgecolor = color if not success_value else 'black'
+            
+            pitch.scatter(
+                sub["x"], sub["y"], ax=ax2,
+                label=None,  # suppress per-success legends to keep only per-type color legend
+                alpha=0.8, s=60,
+                edgecolors=edgecolor,
+                linewidths=1.5,
+                marker=marker,
+                facecolors=facecolor
+            )
 
-        # Convertir en hex pour matplotlib
-        if color.startswith("rgb"):
-            rgb_values = tuple(int(v.strip()) for v in color[4:-1].split(','))
-            hex_color = '#{:02x}{:02x}{:02x}'.format(*rgb_values)
-        else:
-            hex_color = color  # fallback
-
-        pitch.scatter(
-            subset["x"], subset["y"], ax=ax2,
-            label=etype, alpha=0.8, s=60,
-            edgecolors='black', c=hex_color
-        )
-    ax2.legend(title="Event Type", loc="upper right", fontsize="small", title_fontsize="small")
+    # Build simplified legend manually
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', label=etype, markerfacecolor=color_palette[i % len(color_palette)], markeredgecolor='black', markersize=10)
+        for i, etype in enumerate(selected_types)
+    ]
+    ax2.legend(handles=legend_elements, title="Event Type", loc="upper right", fontsize="small", title_fontsize="small")
     st.pyplot(fig2)
 
     st.subheader("📋 Event Table")
