@@ -623,21 +623,50 @@ elif st.session_state.active_tab == "Recovery":
         else:
             st.success("✅ No players under recovery threshold in last 3 days.")
 
-        st.subheader("📉 Player-by-Player Recovery Score Trends")
-        st.markdown("Visualizes individual recovery evolution — helps quickly spot fatigue risks per player.")
-
-        if "player_id" in recovery_data.columns:
-            fig_facet = px.line(
-                recovery_data,
+        st.subheader("📉 Simplified Recovery Trends")
+        st.markdown("Use this section to follow **player recovery evolution** in a more digestible format.")
+ 
+        # Filtre temporel
+        min_date = recovery_data["date"].min()
+        max_date = recovery_data["date"].max()
+        selected_range = st.date_input("📅 Select period", value=(max_date - timedelta(days=14), max_date), min_value=min_date, max_value=max_date)
+ 
+        if isinstance(selected_range, tuple) and len(selected_range) == 2:
+            start_date, end_date = selected_range
+            filtered_recovery = recovery_data[
+                (recovery_data["date"] >= pd.to_datetime(start_date)) &
+                (recovery_data["date"] <= pd.to_datetime(end_date))
+            ]
+        else:
+            filtered_recovery = recovery_data
+ 
+        # Moyenne quotidienne par joueur
+        smoothed = (
+            filtered_recovery
+            .groupby(["date", "player_id"])["recovery_score"]
+            .mean()
+            .reset_index()
+        )
+ 
+        # Sélection de joueurs à afficher
+        available_players = sorted(smoothed["player_id"].unique())
+        selected_players = st.multiselect("👤 Players to display", options=available_players, default=available_players)
+ 
+        smoothed = smoothed[smoothed["player_id"].isin(selected_players)]
+ 
+        if not smoothed.empty:
+            fig_simple = px.line(
+                smoothed,
                 x="date",
                 y="recovery_score",
                 color="player_id",
                 markers=True,
-                title="Recovery Score per Player",
+                title="📈 Recovery Score per Day",
                 labels={"recovery_score": "Recovery (%)", "date": "Date", "player_id": "Player"}
             )
-            fig_facet.update_traces(mode="lines+markers")
-            st.plotly_chart(fig_facet, use_container_width=True)
+            st.plotly_chart(fig_simple, use_container_width=True)
+        else:
+            st.info("No recovery data available for the selected period or players.")
 
     st.subheader("⚖️ Recovery vs Training Load")
     st.markdown("""
@@ -658,24 +687,46 @@ elif st.session_state.active_tab == "Recovery":
         player_data = merged
         title = "All Players – Distance vs Recovery Score"
     
-    if not player_data.empty:
-        fig_corr = px.scatter(
-            player_data,
-            x="distance",
-            y="recovery_score",
-            trendline="ols",
-            opacity=0.7,
-            color="player_id" if selected_player == "All" else None,
-            title=title,
-            labels={"distance": "Distance (m)", "recovery_score": "Recovery (%)"},
-            hover_data=["date"]
-        )
-        fig_corr.update_layout(height=500)
-        st.plotly_chart(fig_corr, use_container_width=True)
-        st.caption("Trendline estimates whether recovery decreases with increased distance. A negative slope may signal overtraining.")
-
+    # Filtrage des données
+    trend_date_range = st.date_input("📅 Select date range for trend analysis", value=(recovery_data["date"].min(), recovery_data["date"].max()))
+    trend_selected_players = st.multiselect("👤 Select players for trend view", options=sorted(recovery_data["player_id"].unique()), default=sorted(recovery_data["player_id"].unique()))
+    if isinstance(trend_date_range, tuple) and len(trend_date_range) == 2:
+        start, end = trend_date_range
+        merged = merged[(merged["date"] >= pd.to_datetime(start)) & (merged["date"] <= pd.to_datetime(end))]
+    
+    merged = merged[merged["player_id"].isin(trend_selected_players)]
+    
+    if not merged.empty:
+        # Un graphe par joueur
+        for pid in trend_selected_players:
+            player_subset = merged[merged["player_id"] == pid]
+            if player_subset.empty:
+                continue
+    
+            fig = px.scatter(
+                player_subset,
+                x="distance",
+                y="recovery_score",
+                trendline="ols",
+                title=f"Player {pid} – Distance vs Recovery",
+                labels={"distance": "Distance (m)", "recovery_score": "Recovery (%)"},
+                opacity=0.7
+            )
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+    
+            # Pente de la tendance
+            model = np.polyfit(player_subset["distance"], player_subset["recovery_score"], 1)
+            slope = model[0]
+    
+            if slope < -0.005:
+                st.error(f"⚠️ Player {pid}: Recovery drops significantly with increased load.")
+            elif slope > 0.005:
+                st.success(f"✅ Player {pid}: Good recovery despite high load.")
+            else:
+                st.warning(f"🟨 Player {pid}: Slight or no correlation between distance and recovery.")
     else:
-        st.info("No recovery data available.")
+        st.info("No recovery data available for selected players or dates.")
     
 elif st.session_state.active_tab == "Physical Development":
     if st.button("⬅️ Back to Home", key="back_home_physical"):
@@ -783,44 +834,50 @@ elif st.session_state.active_tab == "Biography":
         st.session_state.active_tab = "Home"
         st.rerun()
 
-    st.header("📇 Player Profile & Individual Objectives")
+    st.header("📇 Individual Development Plan (IDP)")
 
-    with st.sidebar.expander("➕ Add Individual Goal"):
-        with st.form("add_goal_form"):
-            bio_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="bio_player")
-            goal_desc = st.text_input("🎯 Goal Description", key="goal_desc")
-            goal_status = st.selectbox("📈 Tracking Status", ["In Progress", "Achieved", "Not Started"], key="goal_status")
-            submit_goal = st.form_submit_button("Add Goal")
-            if submit_goal:
-                new_entry = {
-                    "Player Name": str(bio_player),
-                    "Individual Goals": goal_desc,
-                    "Tracking": goal_status
-                }
-                goals_path = "CFC Individual Priority Areas.csv"
-                existing_goals = pd.read_csv(goals_path) if os.path.exists(goals_path) else pd.DataFrame()
-                updated_goals = pd.concat([existing_goals, pd.DataFrame([new_entry])], ignore_index=True)
-                updated_goals.to_csv(goals_path, index=False)
-                st.success("✅ Goal added successfully.")
-                st.rerun()
-
-    if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
-    st.markdown("This section provides an overview of the individual objectives set for players and their achievement status..")
-
-    if not priority_data.empty:
-        st.subheader("🎯 Status of Individual Objectives")
-        if "Tracking" in priority_data.columns:
-            fig_status = px.pie(priority_data, names="Tracking", title="Distribution des Objectifs", hole=0.4)
-            st.plotly_chart(fig_status, use_container_width=True)
-
-        if {"Player Name", "Individual Goals", "Tracking"}.issubset(priority_data.columns):
-            st.subheader("📋 Goals per player")
-            st.dataframe(priority_data[["Player Name", "Individual Goals", "Tracking"]])
-        else:
-            st.dataframe(priority_data)
+    # Charger données existantes
+    dev_plan_path = "CFC Player Dev Plan.csv"
+    if os.path.exists(dev_plan_path):
+        dev_data = pd.read_csv(dev_plan_path)
     else:
-        st.warning("No biographical data available.")
+        dev_data = pd.DataFrame(columns=["player_id", "long_term_goal", "dimensions", "status", "last_update", "coach_notes"])
+
+    st.markdown("🎯 This section tracks long-term and short-term player development objectives.")
+
+    if selected_player == "All":
+        st.warning("Please select a player in the sidebar to view or edit their development plan.")
+    else:
+        player_id = selected_player
+        st.subheader(f"🧑‍🎓 Development Plan for Player {PLAYER_NAMES.get(player_id, player_id)}")
+
+        existing = dev_data[dev_data["player_id"] == player_id].sort_values("last_update", ascending=False)
+        with st.expander("➕ Add or Update Development Objective"):
+            with st.form("add_dev_plan"):
+                long_term_goal = st.text_area("🎯 Long-Term Vision", value=existing["long_term_goal"].iloc[0] if not existing.empty else "")
+                dimensions = st.text_area("📌 Development Focus Areas (e.g. speed, positioning, leadership)", value=existing["dimensions"].iloc[0] if not existing.empty else "")
+                status = st.selectbox("📈 Progress Status", ["Not Started", "In Progress", "On Hold", "Completed"], index=1)
+                notes = st.text_area("📝 Coach Notes", value=existing["coach_notes"].iloc[0] if not existing.empty else "")
+                submitted = st.form_submit_button("💾 Save Plan")
+                if submitted:
+                    new_entry = {
+                        "player_id": player_id,
+                        "long_term_goal": long_term_goal,
+                        "dimensions": dimensions,
+                        "status": status,
+                        "coach_notes": notes,
+                        "last_update": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    }
+                    dev_data = pd.concat([dev_data, pd.DataFrame([new_entry])], ignore_index=True)
+                    dev_data.to_csv(dev_plan_path, index=False)
+                    st.success("✅ Development plan updated successfully.")
+                    st.rerun()
+
+        if not existing.empty:
+            st.markdown("### 📋 Development History")
+            st.dataframe(existing[["last_update", "long_term_goal", "dimensions", "status", "coach_notes"]])
+        else:
+            st.info("No development plan recorded yet for this player.")
     
 elif st.session_state.active_tab == "Injury":
     if st.button("⬅️ Back to Home", key="back_home_injury"):
