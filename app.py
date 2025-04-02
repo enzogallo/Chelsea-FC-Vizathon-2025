@@ -16,6 +16,7 @@ import base64
 import urllib.parse
 import time
 import seaborn as sns
+import matplotlib.colors as mcolors
 
 # ----------------------------
 # CONFIGURATION & SETUP
@@ -56,8 +57,8 @@ def render_home():
 
                 # Affichage image
                 st.markdown(f"""
-                    <img src="data:image/png;base64,{encoded}" 
-                         style="width:100%; height:350px; object-fit:cover; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:0.5rem;" />
+                <img src="data:image/png;base64,{encoded}" 
+                         style="width:100%; height:200px; object-fit:cover; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:0.5rem;" />
                 """, unsafe_allow_html=True)
 
                 # Bouton avec clé unique (ajout d'un préfixe)
@@ -78,7 +79,7 @@ def render_match_analysis():
         filtered_events = event_data
 
     st.subheader("📍 Match Events Heatmap")
-    fig, ax = plt.subplots(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(6, 4))
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
     pitch.draw(ax=ax)
     pitch.scatter(filtered_events["x"], filtered_events["y"], ax=ax, edgecolor='black', alpha=0.7, s=80)
@@ -882,16 +883,39 @@ elif st.session_state.active_tab == "Match Analysis":
     st.subheader("📍 Event Map by Type")
     event_data = pd.read_csv("CFC Match Events Data.csv")
     event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
-
+    
     if selected_player != "All":
         filtered_events = event_data[event_data["player_id"] == selected_player]
     else:
         filtered_events = event_data
 
-    fig2, ax2 = plt.subplots(figsize=(10, 7))
+    st.markdown("🎯 Filter by Event Type")
+    available_types = filtered_events["event_type"].unique().tolist()
+    selected_types = st.multiselect("Select event types to display", options=available_types, default=[], label_visibility="collapsed")
+    filtered_events = filtered_events[filtered_events["event_type"].isin(selected_types)]
+
+    fig2, ax2 = plt.subplots(figsize=(5.5, 3.8))
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
     pitch.draw(ax=ax2)
-    pitch.scatter(filtered_events["x"], filtered_events["y"], ax=ax2, edgecolor='black', alpha=0.7, s=80)
+    color_palette = [c for c in px.colors.qualitative.Safe if c != "rgb(102,194,165)"]
+
+    for i, etype in enumerate(selected_types):
+        subset = filtered_events[filtered_events["event_type"] == etype]
+        color = color_palette[i % len(color_palette)]
+
+        # Convertir en hex pour matplotlib
+        if color.startswith("rgb"):
+            rgb_values = tuple(int(v.strip()) for v in color[4:-1].split(','))
+            hex_color = '#{:02x}{:02x}{:02x}'.format(*rgb_values)
+        else:
+            hex_color = color  # fallback
+
+        pitch.scatter(
+            subset["x"], subset["y"], ax=ax2,
+            label=etype, alpha=0.8, s=60,
+            edgecolors='black', c=hex_color
+        )
+    ax2.legend(title="Event Type", loc="upper right", fontsize="small", title_fontsize="small")
     st.pyplot(fig2)
 
     st.subheader("📋 Event Table")
