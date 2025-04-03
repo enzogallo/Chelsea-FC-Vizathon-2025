@@ -615,6 +615,11 @@ elif st.session_state.active_tab == "Load Demand":
     
 elif st.session_state.active_tab == "Recovery":
     custom_header()
+    player_options = sorted(recovery_data["player_id"].dropna().unique())
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_recovery")
+    if selected_player != "All":
+        selected_player = int(selected_player)
+        recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
     st.header("🛌 Recovery Overview")
 
     st.markdown("🧪 **Recovery Score** – subjective score (0-100) of how recovered a player feels after effort.")
