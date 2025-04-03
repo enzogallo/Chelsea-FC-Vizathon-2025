@@ -153,15 +153,16 @@ def simulate_realistic_gps_data(n_players=3, days=3, points_per_day=100):
  
     return pd.DataFrame(data)
 
-st.markdown("""
-<div style="background-color:#034694; padding:2rem 2rem; border-radius:1rem; color:white; text-align:center; margin-bottom:3rem;">
-    <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:85px; margin-bottom:1rem;" />
-    <h1 style="margin:0; font-size:2.6rem;">Chelsea FC Vizathon Dashboard</h1>
-    <p style="margin-top:0.1rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
-        Designed for elite coaches © Enzo Gallo 2025
-    </p>
-</div>
-""", unsafe_allow_html=True)
+if st.session_state.active_tab == "Home":
+    st.markdown("""
+    <div style="background-color:#034694; padding:2rem 2rem; border-radius:1rem; color:white; text-align:center; margin-bottom:3rem;">
+        <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:85px; margin-bottom:1rem;" />
+        <h1 style="margin:0; font-size:2.6rem;">Chelsea FC Vizathon Dashboard</h1>
+        <p style="margin-top:0.1rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
+            Designed for elite coaches © Enzo Gallo 2025
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ----------------------------
 # LOAD & FORMAT DATA
