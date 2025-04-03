@@ -15,6 +15,7 @@ import easyocr
 import base64
 import urllib.parse
 import time
+import re
  
 
 # ----------------------------
@@ -1261,56 +1262,53 @@ elif st.session_state.active_tab == "Match Analysis":
 
     
 elif st.session_state.active_tab == "Sprint & High Intensity Zones":
-    player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_sprint")
-    if selected_player != "All":
-        selected_player = int(selected_player)
-        gps_data = gps_data[gps_data["player_id"] == selected_player]
     custom_header()
-    st.header("⚡ Sprint & High Intensity Summary")
-    st.markdown("""
-    This simplified module provides a quick view of how much high-intensity effort was produced by each player.
+    st.header("⚡ Sprint & High Intensity Zones")
 
-    - 🔢 **Effort Count**: Number of accelerations above the selected threshold  
-    - 📈 Useful to compare explosive activity across the squad  
+    st.markdown("""
+    This module summarizes high-intensity efforts per player based on accelerations and decelerations detected by GPS.
+    
+    - 📈 Helps identify explosive workloads
+    - 🧠 Useful for return-to-play or training adaptation
     """)
 
-    accel_threshold = st.slider("Minimum acceleration threshold (m/s²)", 1.0, 5.0, 2.5, 0.1)
+    accel_columns = list(sorted(set(
+        col for col in gps_data.columns if "accel_decel_over_" in col
+    )))
 
-    if gps_data.empty:
-        st.warning("No GPS data available.")
+    if not accel_columns:
+        st.warning("No acceleration data found in the GPS file.")
     else:
-        if all(col in gps_data.columns for col in ["x", "y", "date"]):
-            gps_data = gps_data.copy()
+        def format_accel_label(col_name):
+            match = re.search(r"over_(\d+)_(\d+)", col_name)
+            if match:
+                return f"> {match.group(1)}.{match.group(2)} m/s²"
+            else:
+                return col_name
 
-            # Simulate a timestamp if missing
-            if "timestamp" not in gps_data.columns or gps_data["date"].dt.hour.eq(0).all():
-                gps_data = gps_data.sort_values(["player_id", "date"])
-                gps_data["timestamp"] = gps_data.groupby("player_id").cumcount()
-                gps_data["timestamp"] = pd.to_datetime(gps_data["date"]) + pd.to_timedelta(gps_data["timestamp"], unit="s")
-            gps_data["timestamp"] = pd.to_datetime(gps_data["timestamp"])
+        selected_metric = st.selectbox("📊 Select intensity threshold", options=accel_columns, format_func=format_accel_label)
 
-            gps_data["dx"] = gps_data.groupby("player_id")["x"].diff()
-            gps_data["dy"] = gps_data.groupby("player_id")["y"].diff()
-            gps_data["dt"] = gps_data.groupby("player_id")["timestamp"].diff().dt.total_seconds().fillna(1)
-            gps_data["vx"] = gps_data["dx"] / gps_data["dt"]
-            gps_data["vy"] = gps_data["dy"] / gps_data["dt"]
-            gps_data["speed"] = np.sqrt(gps_data["vx"]**2 + gps_data["vy"]**2)
-            gps_data["accel"] = gps_data.groupby("player_id")["speed"].diff() / gps_data["dt"]
+        summary = gps_data.groupby("player_id")[selected_metric].sum().reset_index()
+        summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
+        summary = summary.sort_values(selected_metric, ascending=False)
 
-            # Résumé des efforts
-            summary = (
-                gps_data[gps_data["accel"] >= accel_threshold]
-                .groupby("player_id")
-                .size()
-                .reset_index(name="high_intensity_count")
-            )
-            summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
+        st.subheader("🏃 High-Intensity Efforts by Player")
+        st.dataframe(summary, use_container_width=True)
 
-            st.subheader("📊 High-Intensity Effort Count per Player")
-            st.dataframe(summary)
-        else:
-            st.warning("Missing required columns in GPS data.")
-    
+        fig_summary = px.bar(
+            summary,
+            x="Player",
+            y=selected_metric,
+            title=f"Total Accelerations/Decelerations Above Threshold",
+            labels={selected_metric: "Effort Count"},
+            text_auto=True
+        )
+        fig_summary.update_layout(height=500)
+        st.plotly_chart(fig_summary, use_container_width=True)
 
-   
+        st.markdown("### 📘 Coach Insight")
+        st.markdown("""
+        - Players with high counts have been **explosively involved**
+        - Use this to **monitor progression** or **compare sessions**
+        - ⚠️ Very low counts may indicate underperformance or limited participation
+        """)
