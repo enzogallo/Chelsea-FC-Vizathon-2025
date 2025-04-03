@@ -34,15 +34,15 @@ if "active_tab" not in st.session_state:
 
 module_names = [
     "Home",
-    "Match Analysis",
     "Squad Overview",
     "Load Demand",
     "Recovery",
+    "Sprint & High Intensity Zones",
     "Physical Development",
-    "Biography",
     "Injury",
     "External Factors",
-    "Sprint & High Intensity Zones"
+    "Match Analysis",
+    "Biography"
 ]
  
 def custom_header():
@@ -68,15 +68,15 @@ def render_home():
     cols = st.columns(3)
 
     cards = [
-        {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
         {"label": "Squad Overview", "icon": "🧠", "tab": "Squad Overview"},
         {"label": "Load Demand", "icon": "📈", "tab": "Load Demand"},
         {"label": "Recovery", "icon": "🛌", "tab": "Recovery"},
+        {"label": "Sprint & High Intensity", "icon": "⚡", "tab": "Sprint & High Intensity Zones"},
         {"label": "Physical Development", "icon": "🏋️", "tab": "Physical Development"},
-        {"label": "Biography", "icon": "📇", "tab": "Biography"},
         {"label": "Injury", "icon": "❌", "tab": "Injury"},
         {"label": "External Factors", "icon": "🌍", "tab": "External Factors"},
-        {"label": "Sprint & High Intensity", "icon": "⚡", "tab": "Sprint & High Intensity Zones"},
+        {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
+        {"label": "Biography", "icon": "📇", "tab": "Biography"},
     ]
 
     for i, card in enumerate(cards):
