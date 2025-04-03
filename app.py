@@ -46,7 +46,7 @@ module_names = [
 ]
  
 def custom_header():
-    cols = st.columns([2, 2, 1])
+    cols = st.columns([2, 2.5])
     with cols[1]:
         if st.button("Chelsea FC Dashboard", key="header_home_button"):
             st.session_state.active_tab = "Home"
@@ -187,10 +187,10 @@ def simulate_realistic_gps_data(n_players=3, days=3, points_per_day=100):
 
 if st.session_state.active_tab == "Home":
     st.markdown("""
-    <div style="background-color:#034694; padding:2rem 2rem; border-radius:1rem; color:white; text-align:center; margin-bottom:3rem;">
-        <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:85px; margin-bottom:1rem;" />
+    <div style="background-color:#034694; padding:2rem 2rem; border-radius:1rem; color:white; text-align:center; margin-bottom:3rem; height:250px;">
+        <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:85px; margin-bottom:0.1rem;" />
         <h1 style="margin:0; font-size:2.6rem;">Chelsea FC Vizathon Dashboard</h1>
-        <p style="margin-top:0.1rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
+        <p style="margin-top:0rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
             Designed for elite coaches © Enzo Gallo 2025
         </p>
     </div>
@@ -285,29 +285,6 @@ for df in [gps_data, recovery_data, capability_data]:
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-# ----------------------------
-# === Global Player Filter ===
-if st.session_state.active_tab != "Home":
-    st.sidebar.header("🎯 Player Filter")
-    all_players = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.sidebar.selectbox("Select a player to filter all modules", options=["All"] + list(map(str, all_players)))
-
-    if selected_player != "All":
-        selected_player = int(selected_player)
-
-    if selected_player != "All":
-        gps_data = gps_data[gps_data["player_id"] == selected_player]
-      
-        if "player_id" in recovery_data.columns:
-            recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
-
-        if "player name" in capability_data.columns:
-            capability_data = capability_data[capability_data["player name"] == str(selected_player)]
-
-        if "Player Name" in priority_data.columns:
-            priority_data = priority_data[priority_data["Player Name"] == str(selected_player)]
-else:
-    selected_player = "All"
 
 # ----------------------------
 # READINESS SCORE
@@ -431,6 +408,17 @@ if st.session_state.active_tab == "Home":
     render_home()
 elif st.session_state.active_tab == "Squad Overview":
     custom_header()
+    player_options = sorted(gps_data["player_id"].dropna().unique())
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_squad")
+    if selected_player != "All":
+        selected_player = int(selected_player)
+        gps_data = gps_data[gps_data["player_id"] == selected_player]
+        if "player_id" in recovery_data.columns:
+            recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
+        if "player name" in capability_data.columns:
+            capability_data = capability_data[capability_data["player name"] == str(selected_player)]
+        if "Player Name" in priority_data.columns:
+            priority_data = priority_data[priority_data["Player Name"] == str(selected_player)]
     st.header("🧠 Squad Readiness Overview")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -531,7 +519,7 @@ elif st.session_state.active_tab == "Load Demand":
     custom_header()
     st.header("📈 Match Load Analysis")
 
-    with st.sidebar.expander("➕ Add Training Load Entry"):
+    with st.expander("➕ Add Training Load Entry"):
         with st.form("add_training_load_form"):
             ld_date = st.date_input("📅 Date", value=datetime.today(), key="ld_date")
             ld_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="ld_player")
@@ -635,7 +623,7 @@ elif st.session_state.active_tab == "Recovery":
     """)
 
     # ➕ Add Recovery Entry Form
-    with st.sidebar.expander("➕ Add Recovery Entry"):
+    with st.expander("➕ Add Recovery Entry"):
         with st.form("add_recovery_entry_form"):
             rec_date = st.date_input("📅 Recovery Date", value=datetime.today(), key="rec_date")
             rec_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="rec_player")
@@ -896,6 +884,11 @@ elif st.session_state.active_tab == "Biography":
     custom_header()
     st.header("📇 Individual Development Plan (IDP)")
 
+    player_options = sorted(gps_data["player_id"].dropna().unique())
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_bio")
+    if selected_player != "All":
+        selected_player = int(selected_player)
+
     # Charger données existantes
     dev_plan_path = "CFC Player Dev Plan.csv"
     if os.path.exists(dev_plan_path):
@@ -905,39 +898,36 @@ elif st.session_state.active_tab == "Biography":
 
     st.markdown("🎯 This section tracks long-term and short-term player development objectives.")
 
-    if selected_player == "All":
-        st.warning("Please select a player in the sidebar to view or edit their development plan.")
+    player_id = selected_player
+    st.subheader(f"🧑‍🎓 Development Plan for Player {PLAYER_NAMES.get(player_id, player_id)}")
+ 
+    existing = dev_data[dev_data["player_id"] == player_id].sort_values("last_update", ascending=False)
+    with st.expander("➕ Add or Update Development Objective"):
+        with st.form("add_dev_plan"):
+            long_term_goal = st.text_area("🎯 Long-Term Vision", value=existing["long_term_goal"].iloc[0] if not existing.empty else "")
+            dimensions = st.text_area("📌 Development Focus Areas (e.g. speed, positioning, leadership)", value=existing["dimensions"].iloc[0] if not existing.empty else "")
+            status = st.selectbox("📈 Progress Status", ["Not Started", "In Progress", "On Hold", "Completed"], index=1)
+            notes = st.text_area("📝 Coach Notes", value=existing["coach_notes"].iloc[0] if not existing.empty else "")
+            submitted = st.form_submit_button("💾 Save Plan")
+            if submitted:
+                new_entry = {
+                    "player_id": player_id,
+                    "long_term_goal": long_term_goal,
+                    "dimensions": dimensions,
+                    "status": status,
+                    "coach_notes": notes,
+                    "last_update": datetime.now().strftime("%Y-%m-%d %H:%M")
+                }
+                dev_data = pd.concat([dev_data, pd.DataFrame([new_entry])], ignore_index=True)
+                dev_data.to_csv(dev_plan_path, index=False)
+                st.success("✅ Development plan updated successfully.")
+                st.rerun()
+
+    if not existing.empty:
+        st.markdown("### 📋 Development History")
+        st.dataframe(existing[["last_update", "long_term_goal", "dimensions", "status", "coach_notes"]])
     else:
-        player_id = selected_player
-        st.subheader(f"🧑‍🎓 Development Plan for Player {PLAYER_NAMES.get(player_id, player_id)}")
-
-        existing = dev_data[dev_data["player_id"] == player_id].sort_values("last_update", ascending=False)
-        with st.expander("➕ Add or Update Development Objective"):
-            with st.form("add_dev_plan"):
-                long_term_goal = st.text_area("🎯 Long-Term Vision", value=existing["long_term_goal"].iloc[0] if not existing.empty else "")
-                dimensions = st.text_area("📌 Development Focus Areas (e.g. speed, positioning, leadership)", value=existing["dimensions"].iloc[0] if not existing.empty else "")
-                status = st.selectbox("📈 Progress Status", ["Not Started", "In Progress", "On Hold", "Completed"], index=1)
-                notes = st.text_area("📝 Coach Notes", value=existing["coach_notes"].iloc[0] if not existing.empty else "")
-                submitted = st.form_submit_button("💾 Save Plan")
-                if submitted:
-                    new_entry = {
-                        "player_id": player_id,
-                        "long_term_goal": long_term_goal,
-                        "dimensions": dimensions,
-                        "status": status,
-                        "coach_notes": notes,
-                        "last_update": datetime.now().strftime("%Y-%m-%d %H:%M")
-                    }
-                    dev_data = pd.concat([dev_data, pd.DataFrame([new_entry])], ignore_index=True)
-                    dev_data.to_csv(dev_plan_path, index=False)
-                    st.success("✅ Development plan updated successfully.")
-                    st.rerun()
-
-        if not existing.empty:
-            st.markdown("### 📋 Development History")
-            st.dataframe(existing[["last_update", "long_term_goal", "dimensions", "status", "coach_notes"]])
-        else:
-            st.info("No development plan recorded yet for this player.")
+        st.info("No development plan recorded yet for this player.")
     
 elif st.session_state.active_tab == "Injury":
     custom_header()
@@ -988,7 +978,7 @@ elif st.session_state.active_tab == "External Factors":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     st.markdown("Capture external influences like fatigue, travel, or psychological state that might impact performance.")
 
-    with st.sidebar.expander("➕ Add External Note"):
+    with st.expander("➕ Add External Note"):
         with st.form("external_note_form"):
             note_date = st.date_input("📅 Date concerned", value=datetime.now())
             player_options = ["Whole Team"] + [str(pid) for pid in sorted(gps_data["player_id"].dropna().unique())]
@@ -1017,9 +1007,13 @@ elif st.session_state.active_tab == "External Factors":
     
 elif st.session_state.active_tab == "Match Analysis":
     custom_header()
+    player_options = sorted(gps_data["player_id"].dropna().unique())
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_match")
+    if selected_player != "All":
+        selected_player = int(selected_player)
     st.header("📍 Player Heatmap")
 
-    with st.sidebar.expander("➕ Add Match Event"):
+    with st.expander("➕ Add Match Event"):
         with st.form("add_match_event_form"):
             match_date = st.date_input("📅 Match Date", value=datetime.today())
             match_time = st.time_input("⏱️ Match Time", value=datetime.now().time())
@@ -1184,6 +1178,11 @@ elif st.session_state.active_tab == "Match Analysis":
         st.download_button("Download PDF", data=report, file_name=f"player_{selected_player}_report.pdf", mime="application/pdf")
     
 elif st.session_state.active_tab == "Sprint & High Intensity Zones":
+    player_options = sorted(gps_data["player_id"].dropna().unique())
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_sprint")
+    if selected_player != "All":
+        selected_player = int(selected_player)
+        gps_data = gps_data[gps_data["player_id"] == selected_player]
     custom_header()
     st.header("⚡ Sprint & High Intensity Summary")
     st.markdown("""
