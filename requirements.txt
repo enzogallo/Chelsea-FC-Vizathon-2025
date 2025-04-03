@@ -8,3 +8,13 @@ mplsoccer
 fpdf
 opencv-python-headless
 easyocr
+datetime
+io
+fpdf
+tempfile
+cv2
+easyocr
+base64
+urllib
+time
+re
