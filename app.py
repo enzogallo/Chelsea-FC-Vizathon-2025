@@ -1179,9 +1179,18 @@ elif st.session_state.active_tab == "Match Analysis":
     else:
         st.info("No match data available for replay.")
 
-    if st.button("Download Player Report"):
-        report = generate_player_report(selected_player, filtered_events, color_palette)
-        st.download_button("Download PDF", data=report, file_name=f"player_{selected_player}_report.pdf", mime="application/pdf")
+    if "show_download_button" not in st.session_state:
+        st.session_state.show_download_button = False
+
+    report_bytes = generate_player_report(selected_player, filtered_events, color_palette)
+    st.download_button(
+        label="📄 Download Player Report",
+        data=report_bytes,
+        file_name=f"player_{selected_player}_report.pdf",
+        mime="application/pdf",
+        key="download_player_report"
+    )
+
     
 elif st.session_state.active_tab == "Sprint & High Intensity Zones":
     player_options = sorted(gps_data["player_id"].dropna().unique())
