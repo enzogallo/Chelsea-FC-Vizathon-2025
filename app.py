@@ -1007,11 +1007,11 @@ elif st.session_state.active_tab == "External Factors":
     
 elif st.session_state.active_tab == "Match Analysis":
     custom_header()
+    st.header("📍 Player Heatmap")
     player_options = sorted(gps_data["player_id"].dropna().unique())
     selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_match")
     if selected_player != "All":
         selected_player = int(selected_player)
-    st.header("📍 Player Heatmap")
 
     with st.expander("➕ Add Match Event"):
         with st.form("add_match_event_form"):
@@ -1051,75 +1051,67 @@ elif st.session_state.active_tab == "Match Analysis":
                 st.rerun()
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
-    st.subheader("📍 Heatmap of Match Involvement")
-    event_data = pd.read_csv("CFC Match Events Data.csv")
-    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
-    if selected_player != "All":
-        filtered_events = event_data[event_data["player_id"] == selected_player]
-    else:
-        filtered_events = event_data
-    fig, ax = plt.subplots(figsize=(7, 5))
-    pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
-    pitch.draw(ax=ax)
-    pitch.kdeplot(filtered_events["x"], filtered_events["y"], ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
-    st.pyplot(fig)
 
-    st.subheader("📍 Event Map by Type")
-    event_data = pd.read_csv("CFC Match Events Data.csv")
-    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
-    
-    if selected_player != "All":
-        filtered_events = event_data[event_data["player_id"] == selected_player]
-    else:
-        filtered_events = event_data
+    col1, col2 = st.columns(2)
 
-    st.markdown("🎯 Filter by Event Type")
-    available_types = filtered_events["event_type"].unique().tolist()
-    selected_types = st.multiselect("Select event types to display", options=available_types, default=[], label_visibility="collapsed")
-    filtered_events = filtered_events[filtered_events["event_type"].isin(selected_types)]
+    with col1:
+        st.markdown("#### 📍 Heatmap of Match Involvement")
+        event_data = pd.read_csv("CFC Match Events Data.csv")
+        event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
+        filtered_events = event_data[event_data["player_id"] == selected_player] if selected_player != "All" else event_data
 
-    fig2, ax2 = plt.subplots(figsize=(5.5, 3.8))
-    pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
-    pitch.draw(ax=ax2)
-    color_palette = [mcolors.to_hex(tuple(int(x) / 255 for x in c.strip("rgb()").split(","))) for c in px.colors.qualitative.Safe]
-    if not color_palette:
-        color_palette = ['#1f77b4']  # Fallback color
+        fig, ax = plt.subplots(figsize=(5, 3.2))
+        pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+        pitch.draw(ax=ax)
+        pitch.kdeplot(filtered_events["x"], filtered_events["y"], ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
+        st.pyplot(fig, use_container_width=False)
 
-    success_marker_style = {
-    True: {"marker": "o", "facecolor": None},
-    False: {"marker": "x", "facecolor": "none"}
-    }
+    with col2:
+        st.markdown("#### 📍 Event Map by Type")
+        st.markdown("🎯 Filter by Event Type")
 
-    for i, etype in enumerate(selected_types):
-        subset = filtered_events[filtered_events["event_type"] == etype]
-        color = color_palette[i % len(color_palette)]
- 
-        for success_value in [True, False]:
-            sub = subset[subset["success"] == success_value]
-            
-            # Use circle for success, cross with unique color per stat for fail
-            marker = 'o' if success_value else 'X'
-            facecolor = color if success_value else 'none'
-            edgecolor = color if not success_value else 'black'
-            
-            pitch.scatter(
-                sub["x"], sub["y"], ax=ax2,
-                label=None,  # suppress per-success legends to keep only per-type color legend
-                alpha=0.8, s=60,
-                edgecolors=edgecolor,
-                linewidths=1.5,
-                marker=marker,
-                facecolors=facecolor
-            )
+        available_types = filtered_events["event_type"].dropna().unique().tolist()
+        default_types = ["shot"] if "shot" in available_types else [available_types[0]] if available_types else []
+        selected_types = st.multiselect("Select event types to display", options=available_types, default=default_types, label_visibility="collapsed")        
+        filtered_events = filtered_events[filtered_events["event_type"].isin(selected_types)]
 
-    # Build simplified legend manually
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Line2D([0], [0], marker='o', color='w', label=etype, markerfacecolor=color_palette[i % len(color_palette)], markeredgecolor='black', markersize=10)
-        for i, etype in enumerate(selected_types)
-    ]
-    ax2.legend(handles=legend_elements, title="Event Type", loc="upper right", fontsize="small", title_fontsize="small")
-    st.pyplot(fig2)
+        fig2, ax2 = plt.subplots(figsize=(5, 3.2))
+        pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
+        pitch.draw(ax=ax2)
+
+        import matplotlib.colors as mcolors
+        color_palette = [mcolors.to_hex(tuple(int(x) / 255 for x in c.strip("rgb()").split(","))) for c in px.colors.qualitative.Safe]
+        if not color_palette:
+            color_palette = ['#1f77b4']
+
+        for i, etype in enumerate(selected_types):
+            subset = filtered_events[filtered_events["event_type"] == etype]
+            color = color_palette[i % len(color_palette)]
+
+            for success_value in [True, False]:
+                sub = subset[subset["success"] == success_value]
+                marker = 'o' if success_value else 'X'
+                facecolor = color if success_value else 'none'
+                edgecolor = color if not success_value else 'black'
+
+                pitch.scatter(
+                    sub["x"], sub["y"], ax=ax2,
+                    alpha=0.8, s=60,
+                    edgecolors=edgecolor,
+                    linewidths=1.5,
+                    marker=marker,
+                    facecolors=facecolor
+                )
+
+        from matplotlib.lines import Line2D
+        legend_elements = [
+            Line2D([0], [0], marker='o', color='w', label=etype,
+                markerfacecolor=color_palette[i % len(color_palette)],
+                markeredgecolor='black', markersize=10)
+            for i, etype in enumerate(selected_types)
+        ]
+        ax2.legend(handles=legend_elements, title="Event Type", loc="upper right", fontsize="small", title_fontsize="small")
+        st.pyplot(fig2, use_container_width=False)
 
     st.subheader("🕒 Match Replay Timeline")
     st.markdown("Animated replay of key events over time for a selected match and player.")
