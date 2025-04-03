@@ -579,7 +579,7 @@ elif st.session_state.active_tab == "Load Demand":
             title=f'Distance Covered Over Time – Player {selected_player}',
             labels={'value': 'Distance (m)', 'date': 'Date', 'variable': 'Metric'}
         )
-        fig_distance.update_layout(height=600, width=1000)
+        fig_distance.update_layout(height=800, width=1000)
         fig_distance.add_hline(y=avg_distance, line_dash="dot", annotation_text=f"Moyenne: {avg_distance:.1f} m", line_color="green")
         st.plotly_chart(fig_distance, use_container_width=True)
         st.caption("Tracks the player's total distance covered over time, with a rolling average to highlight physical load trends.")
@@ -594,7 +594,7 @@ elif st.session_state.active_tab == "Load Demand":
                     y=col,
                     title=f"{col.replace('_', ' ').title()} per Session"
                 )
-            fig_accel.update_layout(height=600, width=1000)
+            fig_accel.update_layout(height=800, width=1000)
             mean_val = player_data[col].mean()
             fig_accel.add_hline(y=mean_val, line_dash="dot", line_color="orange", annotation_text=f"Moyenne: {mean_val:.1f}")
             st.plotly_chart(fig_accel, use_container_width=True)
@@ -610,7 +610,7 @@ elif st.session_state.active_tab == "Load Demand":
                 hover_data=["date"],
                 title="Total Distance vs Peak Speed"
             )
-        fig_gps.update_layout(height=600, width=1000)
+        fig_gps.update_layout(height=800, width=1000)
         st.plotly_chart(fig_gps, use_container_width=True)
         st.caption("Shows correlation between total distance and peak speed — useful to assess efficiency of high-speed efforts.")
 
@@ -623,7 +623,7 @@ elif st.session_state.active_tab == "Load Demand":
                 y="distance",
                 title="Average Distance by Opposition"
             )
-        fig_opposition.update_layout(height=600, width=1000)
+        fig_opposition.update_layout(height=800, width=1000)
         avg_opp = opposition_summary["distance"].mean()
         fig_opposition.add_hline(y=avg_opp, line_dash="dot", annotation_text=f"Moyenne: {avg_opp:.1f} m", line_color="gray")
         st.plotly_chart(fig_opposition, use_container_width=True)
@@ -956,6 +956,20 @@ elif st.session_state.active_tab == "Biography":
     if not existing.empty:
         st.markdown("### 📋 Development History")
         st.dataframe(existing[["last_update", "long_term_goal", "dimensions", "status", "coach_notes"]])
+    
+        st.markdown("### 🥧 Overall Objective Completion")
+        pie_data = existing["status"].value_counts().reset_index()
+        pie_data.columns = ["status", "count"]
+        fig_pie = px.pie(
+            pie_data,
+            names="status",
+            values="count",
+            title="Distribution of Development Objective Statuses",
+            hole=0.3
+        )
+        fig_pie.update_traces(textinfo="percent+label")
+        fig_pie.update_layout(height=600)
+        st.plotly_chart(fig_pie, use_container_width=True)
     else:
         st.info("No development plan recorded yet for this player.")
     
