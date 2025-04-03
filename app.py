@@ -32,6 +32,31 @@ if "tab" in params:
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "Home"
 
+module_names = [
+    "Home",
+    "Match Analysis",
+    "Squad Overview",
+    "Load Demand",
+    "Recovery",
+    "Physical Development",
+    "Biography",
+    "Injury",
+    "External Factors",
+    "Sprint & High Intensity Zones"
+]
+
+if st.session_state.active_tab != "Home":
+    selected_tab = st.radio(
+        "Navigation",
+        module_names[1:],  # exclude Home
+        horizontal=True,
+        label_visibility="collapsed",
+        index=module_names[1:].index(st.session_state.active_tab)
+    )
+    if selected_tab != st.session_state.active_tab:
+        st.session_state.active_tab = selected_tab
+        st.rerun()
+
 def render_home():
     cols = st.columns(3)
 
