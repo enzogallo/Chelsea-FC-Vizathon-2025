@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from plotly.io import to_image
 import os
 import numpy as np
 from datetime import datetime, timedelta
