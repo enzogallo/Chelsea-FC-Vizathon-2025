@@ -44,18 +44,25 @@ module_names = [
     "External Factors",
     "Sprint & High Intensity Zones"
 ]
+ 
+def custom_header():
+    cols = st.columns([2, 2, 1])
+    with cols[1]:
+        if st.button("Chelsea FC Dashboard", key="header_home_button"):
+            st.session_state.active_tab = "Home"
+            st.rerun()
 
-if st.session_state.active_tab != "Home":
-    selected_tab = st.radio(
-        "Navigation",
-        module_names[1:],  # exclude Home
-        horizontal=True,
-        label_visibility="collapsed",
-        index=module_names[1:].index(st.session_state.active_tab)
-    )
-    if selected_tab != st.session_state.active_tab:
-        st.session_state.active_tab = selected_tab
-        st.rerun()
+    if st.session_state.active_tab != "Home":
+        selected_tab = st.radio(
+            "Navigation",
+            module_names[1:],  # exclude Home
+            horizontal=True,
+            label_visibility="collapsed",
+            index=module_names[1:].index(st.session_state.active_tab)
+        )
+        if selected_tab != st.session_state.active_tab:
+            st.session_state.active_tab = selected_tab
+            st.rerun()
 
 def render_home():
     cols = st.columns(3)
@@ -423,11 +430,7 @@ def generate_pdf_report(df, title="Team Report", score=None):
 if st.session_state.active_tab == "Home":
     render_home()
 elif st.session_state.active_tab == "Squad Overview":
-    if st.button("⬅️ Back to Home", key="back_home_squad"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("🧠 Squad Readiness Overview")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -525,11 +528,7 @@ elif st.session_state.active_tab == "Squad Overview":
         st.info("No data available for the moment.")
 
 elif st.session_state.active_tab == "Load Demand":
-    if st.button("⬅️ Back to Home", key="back_home_load"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("📈 Match Load Analysis")
 
     with st.sidebar.expander("➕ Add Training Load Entry"):
@@ -625,11 +624,7 @@ elif st.session_state.active_tab == "Load Demand":
         st.caption("Highlights the average distance covered against each opponent — helps understand match demands.")
     
 elif st.session_state.active_tab == "Recovery":
-    if st.button("⬅️ Back to Home", key="back_home_recovery"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("🛌 Recovery Overview")
 
     st.markdown("🧪 **Recovery Score** – subjective score (0-100) of how recovered a player feels after effort.")
@@ -802,11 +797,7 @@ elif st.session_state.active_tab == "Recovery":
         st.info("No recovery data available for selected players or dates.")
     
 elif st.session_state.active_tab == "Physical Development":
-    if st.button("⬅️ Back to Home", key="back_home_physical"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("🏋️ Physical Test Results")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -902,11 +893,7 @@ elif st.session_state.active_tab == "Physical Development":
         st.warning("No physical development data available.")
     
 elif st.session_state.active_tab == "Biography":
-    if st.button("⬅️ Back to Home", key="back_home_biography"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("📇 Individual Development Plan (IDP)")
 
     # Charger données existantes
@@ -953,11 +940,7 @@ elif st.session_state.active_tab == "Biography":
             st.info("No development plan recorded yet for this player.")
     
 elif st.session_state.active_tab == "Injury":
-    if st.button("⬅️ Back to Home", key="back_home_injury"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("❌ Injury & Medical Overview")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -999,11 +982,7 @@ elif st.session_state.active_tab == "Injury":
     ))
     
 elif st.session_state.active_tab == "External Factors":
-    if st.button("⬅️ Back to Home", key="back_home_external"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("🌍 External Context")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -1037,11 +1016,7 @@ elif st.session_state.active_tab == "External Factors":
         st.info("No external notes recorded yet.")
     
 elif st.session_state.active_tab == "Match Analysis":
-    if st.button("⬅️ Back to Home", key="back_home_match"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("📍 Player Heatmap")
 
     with st.sidebar.expander("➕ Add Match Event"):
@@ -1209,11 +1184,7 @@ elif st.session_state.active_tab == "Match Analysis":
         st.download_button("Download PDF", data=report, file_name=f"player_{selected_player}_report.pdf", mime="application/pdf")
     
 elif st.session_state.active_tab == "Sprint & High Intensity Zones":
-    if st.button("⬅️ Back to Home", key="back_home_sprint_top"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
-
+    custom_header()
     st.header("⚡ Sprint & High Intensity Summary")
     st.markdown("""
     This simplified module provides a quick view of how much high-intensity effort was produced by each player.
@@ -1258,9 +1229,6 @@ elif st.session_state.active_tab == "Sprint & High Intensity Zones":
             st.dataframe(summary)
         else:
             st.warning("Missing required columns in GPS data.")
-    if st.button("⬅️ Back to Home", key="back_home_sprint_bottom"):
-        show_spinner()
-        st.session_state.active_tab = "Home"
-        st.rerun()
+    
 
    
