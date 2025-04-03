@@ -15,8 +15,7 @@ import easyocr
 import base64
 import urllib.parse
 import time
-import seaborn as sns
-import matplotlib.colors as mcolors
+ 
 
 # ----------------------------
 # CONFIGURATION & SETUP
@@ -87,13 +86,13 @@ def render_home():
                 with open(image_path, "rb") as img_file:
                     encoded = base64.b64encode(img_file.read()).decode()
 
-                # Affichage image
+                # Display image
                 st.markdown(f"""
                 <img src="data:image/png;base64,{encoded}" 
                          style="width:100%; height:300px; object-fit:cover; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:0.5rem;" />
                 """, unsafe_allow_html=True)
 
-                # Bouton avec clé unique (ajout d'un préfixe)
+                # Button with unique key (prefix added)
                 if st.button(f"{card['icon']} {card['label']}", key=f"btn_{card['tab']}"):
                     show_spinner()
                     st.session_state.active_tab = card["tab"]
@@ -217,7 +216,7 @@ if "injury_status" not in recovery_data.columns or recovery_data["injury_status"
     player_ids = [7, 10, 22]
 
     for player in player_ids:
-        n_injuries = np.random.randint(2, 4)  # max 3 blessures
+        n_injuries = np.random.randint(2, 4)  # max 3 injuries
         injury_dates = pd.date_range(end=datetime.today(), periods=365).to_series().sample(n=n_injuries).sort_values()
         for date in injury_dates:
             injury_entries.append({
@@ -342,14 +341,13 @@ if not gps_data.empty and not recovery_data.empty:
         pdf.cell(200, 10, f"Player {player_id} Heatmap Report", ln=True, align="C")
         pdf.set_font("Arial", '', 12)
         pdf.cell(200, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True, align="C")
-        pdf.image(tmp_img.name, x=30, y=40, w=150)  # baisse la position Y pour éviter la coupe
-        pdf.ln(120)  # ajoute plus d'espace avant la deuxième image
+        pdf.image(tmp_img.name, x=30, y=40, w=150)  # lower the Y position to avoid clipping
+        pdf.ln(120)  # add more space before the second image
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(200, 10, "Event Map by Type", ln=True, align="C")
-        pdf.image(tmp_img2.name, x=30, y=140, w=150)  # décale aussi la 2e image
+        pdf.image(tmp_img2.name, x=30, y=140, w=150)  # shift the second image as well
         
-        import plotly.express as px
-        from plotly.io import to_image
+        
         
         timeline_fig = px.scatter(
             filtered_events,
@@ -402,7 +400,7 @@ def generate_pdf_report(df, title="Team Report", score=None):
 # ----------------------------
 # NAVIGATION LOGIC
 # ----------------------------
-# Lecture du clic simulé (si un formulaire invisible est soumis)
+# Read simulated click (if an invisible form is submitted)
 
 if st.session_state.active_tab == "Home":
     render_home()
@@ -1285,7 +1283,7 @@ elif st.session_state.active_tab == "Sprint & High Intensity Zones":
         if all(col in gps_data.columns for col in ["x", "y", "date"]):
             gps_data = gps_data.copy()
 
-            # Simuler un timestamp si absent
+            # Simulate a timestamp if missing
             if "timestamp" not in gps_data.columns or gps_data["date"].dt.hour.eq(0).all():
                 gps_data = gps_data.sort_values(["player_id", "date"])
                 gps_data["timestamp"] = gps_data.groupby("player_id").cumcount()
