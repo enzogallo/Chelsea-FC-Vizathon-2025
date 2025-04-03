@@ -1153,11 +1153,25 @@ elif st.session_state.active_tab == "Match Analysis":
                     title=f"📊 Event Timeline – Player {selected_player_replay}",
                     labels={"timestamp": "Time", "event_type": "Event Type"}
                 )
+                fig_timeline.update_traces(marker=dict(size=12))
                 fig_timeline.update_layout(
-                    height=500,
-                    yaxis_title="Event Type",
-                    xaxis_title="Timestamp",
-                    showlegend=True
+                    height=700,
+                    width=1000,
+                    xaxis=dict(
+                        title="Timestamp",
+                        title_font=dict(size=16),
+                        tickfont=dict(size=14)
+                    ),
+                    yaxis=dict(
+                        title="Event Type",
+                        title_font=dict(size=16),
+                        tickfont=dict(size=16)
+                    ),
+                    showlegend=True,
+                    legend=dict(
+                        font=dict(size=18),
+                        title_font=dict(size=18)
+                    )
                 )
                 st.plotly_chart(fig_timeline, use_container_width=True)
         else:
