@@ -412,13 +412,17 @@ elif st.session_state.active_tab == "Squad Overview":
     selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_squad")
     if selected_player != "All":
         selected_player = int(selected_player)
-        gps_data = gps_data[gps_data["player_id"] == selected_player]
-        if "player_id" in recovery_data.columns:
-            recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
-        if "player name" in capability_data.columns:
-            capability_data = capability_data[capability_data["player name"] == str(selected_player)]
-        if "Player Name" in priority_data.columns:
-            priority_data = priority_data[priority_data["Player Name"] == str(selected_player)]
+        capability_data = capability_data[capability_data["player_id"] == selected_player]
+        recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
+        gps_data_filtered = gps_data[gps_data["player_id"] == selected_player]
+        recovery_data_filtered = recovery_data[recovery_data["player_id"] == selected_player]
+    else:
+        gps_data_filtered = gps_data
+        recovery_data_filtered = recovery_data
+    gps_latest = gps_data_filtered.sort_values("date").groupby(["player_id", "date"]).tail(1)
+    rec_latest = recovery_data_filtered.sort_values("date").groupby(["player_id", "date"]).tail(1)
+    readiness_df = pd.merge(gps_latest, rec_latest, on=["player_id", "date"])
+    readiness_df["readiness_score"] = readiness_df.apply(calculate_readiness, axis=1)
     st.header("🧠 Squad Readiness Overview")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -551,6 +555,15 @@ elif st.session_state.active_tab == "Load Demand":
     else:
         player_data = gps_data
 
+    if not player_data.empty and "date" in player_data.columns:
+        min_date = player_data["date"].min()
+        max_date = player_data["date"].max()
+        selected_range = st.date_input("📅 Select date range", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+
+        if isinstance(selected_range, tuple) and len(selected_range) == 2:
+            start_date, end_date = selected_range
+            player_data = player_data[(player_data["date"] >= pd.to_datetime(start_date)) & (player_data["date"] <= pd.to_datetime(end_date))]
+
     st.subheader("🎯 Filter by Player")
     st.info("⚠️ Null distances have been excluded as they correspond to non-participation (players not lined up)..")
     
@@ -567,6 +580,7 @@ elif st.session_state.active_tab == "Load Demand":
             title=f'Distance Covered Over Time – Player {selected_player}',
             labels={'value': 'Distance (m)', 'date': 'Date', 'variable': 'Metric'}
         )
+        fig_distance.update_layout(height=600, width=1000)
         fig_distance.add_hline(y=avg_distance, line_dash="dot", annotation_text=f"Moyenne: {avg_distance:.1f} m", line_color="green")
         st.plotly_chart(fig_distance, use_container_width=True)
         st.caption("Tracks the player's total distance covered over time, with a rolling average to highlight physical load trends.")
@@ -577,10 +591,11 @@ elif st.session_state.active_tab == "Load Demand":
         for col in accel_cols:
             fig_accel = px.line(
                 player_data.sort_values("date"),
-                x="date",
-                y=col,
-                title=f"{col.replace('_', ' ').title()} per Session"
-            )
+                    x="date",
+                    y=col,
+                    title=f"{col.replace('_', ' ').title()} per Session"
+                )
+            fig_accel.update_layout(height=600, width=1000)
             mean_val = player_data[col].mean()
             fig_accel.add_hline(y=mean_val, line_dash="dot", line_color="orange", annotation_text=f"Moyenne: {mean_val:.1f}")
             st.plotly_chart(fig_accel, use_container_width=True)
@@ -589,13 +604,14 @@ elif st.session_state.active_tab == "Load Demand":
     # Total Distance vs Peak Speed with Trendline
     if "peak_speed" in player_data.columns:
         fig_gps = px.scatter(
-            player_data,
-            x="distance",
-            y="peak_speed",
-            trendline="ols",
-            hover_data=["date"],
-            title="Total Distance vs Peak Speed"
-        )
+                player_data,
+                x="distance",
+                y="peak_speed",
+                trendline="ols",
+                hover_data=["date"],
+                title="Total Distance vs Peak Speed"
+            )
+        fig_gps.update_layout(height=600, width=1000)
         st.plotly_chart(fig_gps, use_container_width=True)
         st.caption("Shows correlation between total distance and peak speed — useful to assess efficiency of high-speed efforts.")
 
@@ -603,11 +619,12 @@ elif st.session_state.active_tab == "Load Demand":
     if "opposition_full" in player_data.columns:
         opposition_summary = player_data.groupby("opposition_full")["distance"].mean().reset_index()
         fig_opposition = px.bar(
-            opposition_summary,
-            x="opposition_full",
-            y="distance",
-            title="Average Distance by Opposition"
-        )
+                opposition_summary,
+                x="opposition_full",
+                y="distance",
+                title="Average Distance by Opposition"
+            )
+        fig_opposition.update_layout(height=600, width=1000)
         avg_opp = opposition_summary["distance"].mean()
         fig_opposition.add_hline(y=avg_opp, line_dash="dot", annotation_text=f"Moyenne: {avg_opp:.1f} m", line_color="gray")
         st.plotly_chart(fig_opposition, use_container_width=True)
@@ -662,6 +679,7 @@ elif st.session_state.active_tab == "Recovery":
         fig_weekly = px.line(weekly_avg, x="week", y="recovery_score", markers=True,
                             title="Team Recovery Score per Week",
                             labels={"recovery_score": "Avg Recovery (%)", "week": "Week"})
+        fig_weekly.update_layout(height=600, width=1000)
         fig_weekly.add_hrect(y0=0, y1=50, fillcolor="red", opacity=0.1, line_width=0)
         fig_weekly.add_hrect(y0=50, y1=70, fillcolor="orange", opacity=0.1, line_width=0)
         fig_weekly.add_hrect(y0=70, y1=100, fillcolor="green", opacity=0.1, line_width=0)
@@ -727,6 +745,7 @@ elif st.session_state.active_tab == "Recovery":
                 title="📈 Recovery Score per Day",
                 labels={"recovery_score": "Recovery (%)", "date": "Date", "player_id": "Player"}
             )
+            fig_simple.update_layout(height=600, width=1000)
             st.plotly_chart(fig_simple, use_container_width=True)
         else:
             st.info("No recovery data available for the selected period or players.")
@@ -793,6 +812,11 @@ elif st.session_state.active_tab == "Recovery":
     
 elif st.session_state.active_tab == "Physical Development":
     custom_header()
+    player_options = sorted(gps_data["player_id"].dropna().unique())
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_physical")
+    if selected_player != "All":
+        selected_player = int(selected_player)
+        capability_data = capability_data[capability_data["player_id"] == selected_player]
     st.header("🏋️ Physical Test Results")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
@@ -938,9 +962,14 @@ elif st.session_state.active_tab == "Biography":
     
 elif st.session_state.active_tab == "Injury":
     custom_header()
+    player_options = sorted(gps_data["player_id"].dropna().unique())
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_injury")
+    if selected_player != "All":
+        selected_player = int(selected_player)
     st.header("❌ Injury & Medical Overview")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
+        recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
     st.markdown("Tracking injuries and analyzing availability trends.")
 
     if not recovery_data.empty:
@@ -954,6 +983,7 @@ elif st.session_state.active_tab == "Injury":
             if not filtered_injuries.empty:
                 st.success(f"✅ {len(filtered_injuries)} injuries detected in the dataset.")
                 fig_injury = px.histogram(filtered_injuries, x="injury_status", title="Breakdown of injuries")
+                fig_injury.update_layout(height=600, width=1000)
                 st.plotly_chart(fig_injury, use_container_width=True)
             else:
                 st.info("✅ No injuries currently detected for the selected timeframe.")
@@ -964,7 +994,34 @@ elif st.session_state.active_tab == "Injury":
                 recovery_data["injury_status"].notna()
             ]
             if not injury_timeline.empty:
-                fig_timeline = px.scatter(injury_timeline, x="date", y="injury_status", color="injury_status", title="Injury history")
+                fig_timeline = px.scatter(
+                    injury_timeline,
+                    x="date",
+                    y="injury_status",
+                    color="injury_status",
+                    title="📅 Injury history",
+                    labels={"date": "Date", "injury_status": "Injury Type"}
+                )
+                fig_timeline.update_traces(marker=dict(size=12))
+                fig_timeline.update_layout(
+                    height=700,
+                    width=1000,
+                    xaxis=dict(
+                        title="Date",
+                        title_font=dict(size=16),
+                        tickfont=dict(size=14)
+                    ),
+                    yaxis=dict(
+                        title="Injury Type",
+                        title_font=dict(size=16),
+                        tickfont=dict(size=16)
+                    ),
+                    showlegend=True,
+                    legend=dict(
+                        font=dict(size=18),
+                        title_font=dict(size=18)
+                    )
+                )
                 st.plotly_chart(fig_timeline, use_container_width=True)
             else:
                 st.warning("ℹ️ No confirmed injuries found in the dataset.")
@@ -980,6 +1037,10 @@ elif st.session_state.active_tab == "Injury":
     
 elif st.session_state.active_tab == "External Factors":
     custom_header()
+    player_options = sorted(gps_data["player_id"].dropna().unique())
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_external")
+    if selected_player != "All":
+        selected_player = int(selected_player)
     st.header("🌍 External Context")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
