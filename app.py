@@ -542,12 +542,14 @@ elif st.session_state.active_tab == "Load Demand":
                 st.success("✅ Training load entry added successfully.")
                 st.rerun()
 
-    if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
     player_list = gps_data["player_id"].dropna().unique()
-    selected_player = st.selectbox("Select Player for Individual View", player_list)
-    player_data = gps_data[gps_data["player_id"] == selected_player]
-    player_data = player_data[player_data["distance"] > 0]
+    selected_player = st.selectbox("Select Player for Individual View", options=["All"] + list(map(str, sorted(player_list))), key="player_filter_load")
+    if selected_player != "All":
+        selected_player = int(selected_player)
+        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
+        player_data = gps_data[gps_data["player_id"] == selected_player]
+    else:
+        player_data = gps_data
 
     st.subheader("🎯 Filter by Player")
     st.info("⚠️ Null distances have been excluded as they correspond to non-participation (players not lined up)..")
