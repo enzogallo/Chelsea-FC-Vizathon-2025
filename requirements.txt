@@ -8,3 +8,5 @@ mplsoccer
 fpdf
 opencv-python-headless
 easyocr
+statsmodels
+kaleido

@@ -1044,10 +1044,6 @@ elif st.session_state.active_tab == "Injury":
     else:
         st.info("No recovery or injury data available.")
 
-    st.caption("📌 Debug: Injury dates range from {} to {}".format(
-        recovery_data['date'].min().strftime('%Y-%m-%d'),
-        recovery_data['date'].max().strftime('%Y-%m-%d')
-    ))
     
 elif st.session_state.active_tab == "External Factors":
     custom_header()
