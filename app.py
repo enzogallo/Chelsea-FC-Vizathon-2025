@@ -319,7 +319,7 @@ if not gps_data.empty and not recovery_data.empty:
         x_vals = np.random.normal(52.5, 20, 100)
         y_vals = np.random.normal(34, 15, 100)
         pitch.kdeplot(x_vals, y_vals, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
-        tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir="/tmp")
         fig.savefig(tmp_img.name)
         plt.close(fig)
 
@@ -333,7 +333,7 @@ if not gps_data.empty and not recovery_data.empty:
             ax2.scatter(sub["x"], sub["y"], label=etype, c=color, alpha=0.6, edgecolors="black")
 
         ax2.legend()
-        tmp_img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        tmp_img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir="/tmp")
         fig2.savefig(tmp_img2.name)
         plt.close(fig2)
 
@@ -362,7 +362,7 @@ if not gps_data.empty and not recovery_data.empty:
         )
         timeline_fig.update_layout(height=400)
         
-        tmp_img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        tmp_img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir="/tmp")
         img_bytes = to_image(timeline_fig, format="png", width=800, height=400)
         with open(tmp_img3.name, "wb") as f:
             f.write(img_bytes)
@@ -384,7 +384,7 @@ def generate_pdf_report(df, title="Team Report", score=None):
     pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
     pitch.draw(ax=ax)
     pitch.kdeplot(np.random.uniform(0, 105, 100), np.random.uniform(0, 68, 100), ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
-    tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir="/tmp")
     fig.savefig(tmp_img.name)
     plt.close(fig)
 
