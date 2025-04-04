@@ -10,3 +10,4 @@ opencv-python-headless
 easyocr
 statsmodels
 kaleido
+streamlit-card
