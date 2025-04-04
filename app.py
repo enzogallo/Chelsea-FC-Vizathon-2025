@@ -35,6 +35,7 @@ if "active_tab" not in st.session_state:
 
 module_names = [
     "Home",
+    "Match Analysis",
     "Squad Overview",
     "Load Demand",
     "Recovery",
@@ -42,12 +43,11 @@ module_names = [
     "Physical Development",
     "Injury",
     "External Factors",
-    "Match Analysis",
     "Biography"
 ]
  
 def custom_header():
-    cols = st.columns([2, 2.5])
+    cols = st.columns([2, 2.7])
     with cols[1]:
         if st.button("Chelsea FC Dashboard", key="header_home_button"):
             st.session_state.active_tab = "Home"
@@ -69,6 +69,7 @@ def render_home():
     cols = st.columns(3)
 
     cards = [
+        {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
         {"label": "Squad Overview", "icon": "🧠", "tab": "Squad Overview"},
         {"label": "Load Demand", "icon": "📈", "tab": "Load Demand"},
         {"label": "Recovery", "icon": "🛌", "tab": "Recovery"},
@@ -76,7 +77,6 @@ def render_home():
         {"label": "Physical Development", "icon": "🏋️", "tab": "Physical Development"},
         {"label": "Injury", "icon": "❌", "tab": "Injury"},
         {"label": "External Factors", "icon": "🌍", "tab": "External Factors"},
-        {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
         {"label": "Biography", "icon": "📇", "tab": "Biography"},
     ]
 
