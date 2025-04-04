@@ -17,6 +17,7 @@ import base64
 import urllib.parse
 import time
 import re
+from streamlit_card import card
  
 
 # ----------------------------
@@ -80,25 +81,45 @@ def render_home():
         {"label": "Biography", "icon": "📇", "tab": "Biography"},
     ]
 
-    for i, card in enumerate(cards):
+    for i, card_data in enumerate(cards):
         col = cols[i % 3]
         with col:
-            image_path = f"images/{card['tab'].lower().replace(' ', '_')}.png"
+            image_path = f"images/{card_data['tab'].lower().replace(' ', '_')}.png"
             if os.path.exists(image_path):
                 with open(image_path, "rb") as img_file:
                     encoded = base64.b64encode(img_file.read()).decode()
+                    image_url = f"data:image/png;base64,{encoded}"
+            else:
+                image_url = None
 
-                # Display image
-                st.markdown(f"""
-                <img src="data:image/png;base64,{encoded}" 
-                         style="width:100%; height:300px; object-fit:cover; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:0.5rem;" />
-                """, unsafe_allow_html=True)
+            clicked = card(
+                title=card_data["label"],
+                text="",
+                image=image_url,
+                styles={
+                    "card": {
+                        "width": "100%",
+                        "height": "330px",
+                        "border-radius": "12px",
+                        "box-shadow": "0 4px 12px rgba(0,0,0,0.15)",
+                        "margin-bottom": "0.1rem"
+                    },
+                    "title": {
+                        "font-size": "22px",
+                        "font-weight": "bold"
+                    },
+                    "image": {
+                        "height": "200px",
+                        "object-fit": "cover"
+                    }
+                },
+                key=f"card_{card_data['tab']}"
+            )
 
-                # Button with unique key (prefix added)
-                if st.button(f"{card['icon']} {card['label']}", key=f"btn_{card['tab']}"):
-                    show_spinner()
-                    st.session_state.active_tab = card["tab"]
-                    st.rerun()
+            if clicked:
+                show_spinner()
+                st.session_state.active_tab = card_data["tab"]
+                st.rerun()
 
 def render_match_analysis():
     st.header("⚽ Match Events Analysis")
