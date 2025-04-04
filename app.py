@@ -1,4 +1,7 @@
 import streamlit as st
+from streamlit_extras.stylable_container import stylable_container
+from streamlit_extras.app_logo import add_logo
+from streamlit_option_menu import option_menu
 import pandas as pd
 import plotly.express as px
 from plotly.io import to_image
@@ -35,12 +38,11 @@ if "active_tab" not in st.session_state:
     st.session_state.active_tab = "Home"
 
 module_names = [
-    "Home",
     "Match Analysis",
     "Squad Overview",
     "Load Demand",
     "Recovery",
-    "Sprint & High Intensity Zones",
+    "Sprint & High Intensity",
     "Physical Development",
     "Injury",
     "External Factors",
@@ -48,33 +50,63 @@ module_names = [
 ]
  
 def custom_header():
-    cols = st.columns([2, 2.7])
-    with cols[1]:
-        if st.button("Chelsea FC Dashboard", key="header_home_button"):
-            st.session_state.active_tab = "Home"
-            st.rerun()
+    with st.container():
+        add_logo("https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg", height=80)
+        with stylable_container("header-button", css_styles="""
+            button {
+                background-color: #034694;
+                color: white;
+                font-weight: bold;
+                padding: 0.75rem 2rem;
+                border-radius: 0.5rem;
+                border: none;
+                font-size: 1.1rem;
+                margin-top: 0.5rem;
+                cursor: pointer;
+            }
+            button:hover {
+                background-color: #012d5e;
+            }
+        """):
+            if st.button("⚽ Chelsea FC Vizathon Dashboard", key="home_nav_button"):
+                st.session_state.active_tab = "Home"
+                st.rerun()
+        st.caption("© Enzo Gallo 2025")
+    st.markdown("---")
 
-    if st.session_state.active_tab != "Home":
-        selected_tab = st.radio(
-            "Navigation",
-            module_names[1:],  # exclude Home
-            horizontal=True,
-            label_visibility="collapsed",
-            index=module_names[1:].index(st.session_state.active_tab)
-        )
-        if selected_tab != st.session_state.active_tab:
-            st.session_state.active_tab = selected_tab
-            st.rerun()
+    selected_tab = option_menu(
+        menu_title=None,
+        options=module_names,
+        icons=["house", "bar-chart", "people", "graph-up", "heart", "lightning", "activity", "exclamation-triangle", "globe", "card-text"],
+        orientation="horizontal",
+        default_index=module_names.index(st.session_state.active_tab),
+        styles={
+            "container": {"padding": "0!important", "background-color": "#034694"},
+            "icon": {"color": "white", "font-size": "18px"},
+            "nav-link": {
+                "font-size": "16px",
+                "text-align": "center",
+                "margin": "0px",
+                "color": "white",
+                "padding": "10px 15px",
+            },
+            "nav-link-selected": {"background-color": "#012d5e"},
+        }
+    )
+    if selected_tab != st.session_state.active_tab:
+        show_spinner()
+        st.session_state.active_tab = selected_tab
+        st.rerun()
 
 def render_home():
-    cols = st.columns(3)
+    cols = st.columns(3, gap="small")
 
     cards = [
         {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
         {"label": "Squad Overview", "icon": "🧠", "tab": "Squad Overview"},
         {"label": "Load Demand", "icon": "📈", "tab": "Load Demand"},
         {"label": "Recovery", "icon": "🛌", "tab": "Recovery"},
-        {"label": "Sprint & High Intensity", "icon": "⚡", "tab": "Sprint & High Intensity Zones"},
+        {"label": "Sprint & High Intensity", "icon": "⚡", "tab": "Sprint & High Intensity"},
         {"label": "Physical Development", "icon": "🏋️", "tab": "Physical Development"},
         {"label": "Injury", "icon": "❌", "tab": "Injury"},
         {"label": "External Factors", "icon": "🌍", "tab": "External Factors"},
@@ -99,10 +131,11 @@ def render_home():
                 styles={
                     "card": {
                         "width": "100%",
-                        "height": "330px",
+                        "height": "300px",
                         "border-radius": "12px",
                         "box-shadow": "0 4px 12px rgba(0,0,0,0.15)",
-                        "margin-bottom": "0.1rem"
+                        "margin-bottom": "0",
+                        "margin-top": "0"
                     },
                     "title": {
                         "font-size": "22px",
@@ -880,43 +913,48 @@ elif st.session_state.active_tab == "Physical Development":
             else:
                 st.warning("❌ Required columns not found in capability_data.")
 
-        st.subheader("📦 Score Spread per Test Type")
-        if 'test name' in capability_data.columns and 'score' in capability_data.columns:
-            fig_score = px.box(
+        st.subheader("📊 Performance Distribution by Movement Type")
+        if {'movement', 'benchmarkpct'}.issubset(capability_data.columns):
+            fig_violin = px.violin(
                 capability_data,
-                x='test name',
-                y='score',
+                x='movement',
+                y='benchmarkpct',
+                box=True,
                 points='all',
-                title='Score Spread for Each Test',
-                labels={'score': 'Score', 'test name': 'Test'}
+                title='Violin Plot of Performance Distribution by Movement Type',
+                labels={'benchmarkpct': 'Benchmark (%)', 'movement': 'Movement Type'}
             )
-            st.plotly_chart(fig_score, use_container_width=True)
-            st.caption("This view helps spot test variability: large spreads may suggest inconsistency or need for standardization.")
-
-        st.subheader("📈 Progression Over Time")
-        if "testDate" in capability_data.columns and "benchmarkpct" in capability_data.columns:
-            try:
-                capability_data["testDate"] = pd.to_datetime(capability_data["testDate"], dayfirst=True, errors="coerce")
-                trend = (
-                    capability_data.dropna(subset=["benchmarkpct"])
-                    .groupby("testDate")["benchmarkpct"]
-                    .mean()
-                    .reset_index()
-                    .sort_values("testDate")
-                )
-                fig_trend = px.line(
-                    trend,
-                    x="testDate",
+            fig_violin.update_layout(height=600, width=1000)
+            st.plotly_chart(fig_violin, use_container_width=True)
+            st.caption("Violin plot showing distribution of benchmark percentages per movement type, including box plot details.")
+        else:
+            st.warning("Required data ('movement', 'benchmarkpct') not available to display performance distribution.")
+            
+        st.subheader("📈 Benchmark Progression Over Time")
+        required_columns = {"testdate", "benchmarkpct"}
+        if required_columns.issubset(capability_data.columns):
+            capability_data["testdate"] = pd.to_datetime(capability_data["testdate"], errors='coerce')
+            valid_data = capability_data.dropna(subset=["testdate", "benchmarkpct"])
+            
+            if not valid_data.empty:
+                fig_progress = px.scatter(
+                    valid_data,
+                    x="testdate",
                     y="benchmarkpct",
-                    title="📈 Evolution of Avg Benchmark % Over Time",
-                    labels={"benchmarkpct": "% Benchmark", "testDate": "Date"},
-                    markers=True
+                    trendline="lowess",
+                    title="Benchmark Progression Over Time",
+                    labels={"benchmarkpct": "Benchmark (%)", "testdate": "Test Date"}
                 )
-                fig_trend.add_hline(y=100, line_dash="dot", line_color="green")
-                st.plotly_chart(fig_trend, use_container_width=True)
-                st.caption("If values trend upwards, physical conditioning is improving. Staying around 100% means players are at expected level.")
-            except Exception as e:
-                st.warning("Cannot display time trend: invalid test dates")
+                fig_progress.add_hline(y=100, line_dash="dash", line_color="green",
+                                         annotation_text="Target Benchmark (100%)",
+                                         annotation_position="bottom right")
+                fig_progress.update_layout(height=600, width=1000)
+                st.plotly_chart(fig_progress, use_container_width=True)
+                st.caption("Scatter plot with lowess trendline showing progression of benchmark percentages over time.")
+            else:
+                st.warning("No valid data available to display benchmark progression.")
+        else:
+            st.warning("Missing required data ('testdate', 'benchmarkpct') to display benchmark progression over time.")
 
         st.subheader("📘 Coach Takeaways")
         st.markdown("""
@@ -1293,7 +1331,7 @@ elif st.session_state.active_tab == "Match Analysis":
         )
 
     
-elif st.session_state.active_tab == "Sprint & High Intensity Zones":
+elif st.session_state.active_tab == "Sprint & High Intensity":
     custom_header()
     st.header("⚡ Sprint & High Intensity Zones")
 

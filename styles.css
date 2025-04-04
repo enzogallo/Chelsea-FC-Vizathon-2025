@@ -1,7 +1,11 @@
+html, body, .main {
+    background: linear-gradient(120deg, #034694 0%, #012d5e 100%) !important;
+    color: white;
+}
+
 /** === Global Styles === */
 body {
     font-family: 'Poppins', sans-serif;
-    background-color: #ffffff !important;
     color: #1c1c1c !important;
 }
 
