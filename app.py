@@ -26,7 +26,7 @@ from streamlit_card import card
 # ----------------------------
 # CONFIGURATION & SETUP
 # ----------------------------
-st.set_page_config(page_title="Chelsea FC Vizathon Dashboard", layout="wide")
+st.set_page_config(page_title="CFC Data Center", layout="wide")
 
 PLAYER_NAMES = {7: "Sterling", 10: "Mudryk", 22: "Chilwell"}
 
@@ -68,10 +68,10 @@ def custom_header():
                 background-color: #012d5e;
             }
         """):
-            if st.button("⚽ Chelsea FC Vizathon Dashboard", key="home_nav_button"):
+            if st.button("⚽ CFC Data Center", key="home_nav_button"):
                 st.session_state.active_tab = "Home"
                 st.rerun()
-        st.caption("© Enzo Gallo 2025")
+        st.caption("© CFC Data Center by Enzo Gallo, 2025")
     st.markdown("---")
 
     selected_tab = option_menu(
@@ -99,7 +99,7 @@ def custom_header():
         st.rerun()
 
 def render_home():
-    cols = st.columns(3, gap="small")
+    cols = st.columns(3, gap="small", vertical_alignment="top")
 
     cards = [
         {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
@@ -131,18 +131,17 @@ def render_home():
                 styles={
                     "card": {
                         "width": "100%",
-                        "height": "300px",
+                        "height": "180px",
                         "border-radius": "12px",
                         "box-shadow": "0 4px 12px rgba(0,0,0,0.15)",
-                        "margin-bottom": "0",
-                        "margin-top": "0"
+                        "margin-bottom": "-30px",
+                        "margin-top": "-30px"
                     },
                     "title": {
                         "font-size": "22px",
                         "font-weight": "bold"
                     },
                     "image": {
-                        "height": "200px",
                         "object-fit": "cover"
                     }
                 },
@@ -242,12 +241,16 @@ def simulate_realistic_gps_data(n_players=3, days=3, points_per_day=100):
 
 if st.session_state.active_tab == "Home":
     st.markdown("""
-    <div style="background-color:#034694; padding:2rem 2rem; border-radius:1rem; color:white; text-align:center; margin-bottom:3rem;">
-        <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:85px; margin-bottom:0.1rem;" />
-        <h1 style="margin:0; font-size:2.6rem;">Chelsea FC Vizathon Dashboard</h1>
-        <p style="margin-top:0rem; font-size:1.1rem; max-width:750px; margin-left:auto; margin-right:auto;">
-            Designed for elite coaches © Enzo Gallo 2025
-        </p>
+    <div style="background-color:#034694; padding:0.1rem 0.5rem; border-radius:1rem; color:white; margin-bottom:2rem;">
+        <div style="text-align:center;">
+            <div style="display:flex; align-items:center; justify-content:center; gap:1rem;">
+                    <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:70px; padding:0.5rem 0.5rem;" />
+                    <h1 style="margin:0; font-size:1.8rem;">CFC Data Center</h1>
+            </div>
+            <p style="margin-top:0rem; font-size:0.9rem;">
+                From data to decisions – a custom-built platform powering Chelsea FC’s performance strategy. © Designed by Enzo Gallo, 2025.
+            </p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -479,7 +482,7 @@ elif st.session_state.active_tab == "Squad Overview":
     readiness_df["readiness_score"] = readiness_df.apply(calculate_readiness, axis=1)
     st.header("🧠 Squad Readiness Overview")
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
+        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
     st.markdown("""
     This module helps you understand the **team's physical availability and fatigue levels**.
     It provides **daily insights** to help adjust your training load, plan recovery, and reduce injury risks.
@@ -604,7 +607,7 @@ elif st.session_state.active_tab == "Load Demand":
     selected_player = st.selectbox("Select Player for Individual View", options=["All"] + list(map(str, sorted(player_list))), key="player_filter_load")
     if selected_player != "All":
         selected_player = int(selected_player)
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
+        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
         player_data = gps_data[gps_data["player_id"] == selected_player]
     else:
         player_data = gps_data
@@ -873,7 +876,7 @@ elif st.session_state.active_tab == "Physical Development":
         capability_data = capability_data[capability_data["player_id"] == selected_player]
     st.header("🏋️ Physical Test Results")
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
+        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
 
     if not capability_data.empty:
         st.markdown("""
@@ -1041,7 +1044,7 @@ elif st.session_state.active_tab == "Injury":
         selected_player = int(selected_player)
     st.header("❌ Injury & Medical Overview")
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
+        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
         recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
     st.markdown("Tracking injuries and analyzing availability trends.")
 
@@ -1112,7 +1115,7 @@ elif st.session_state.active_tab == "External Factors":
         selected_player = int(selected_player)
     st.header("🌍 External Context")
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
+        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
     st.markdown("Capture external influences like fatigue, travel, or psychological state that might impact performance.")
 
     with st.expander("➕ Add External Note"):
@@ -1187,7 +1190,7 @@ elif st.session_state.active_tab == "Match Analysis":
                 st.success("✅ Match event successfully added.")
                 st.rerun()
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {selected_player}** only.")
+        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
 
     col1, col2 = st.columns(2)
 
