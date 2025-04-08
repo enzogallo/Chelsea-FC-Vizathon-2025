@@ -527,7 +527,12 @@ elif st.session_state.active_tab == "Squad Overview":
         low = readiness_df[readiness_df["readiness_score"] < 60].shape[0]
         moderate = readiness_df[(readiness_df["readiness_score"] >= 60) & (readiness_df["readiness_score"] < 75)].shape[0]
         high = readiness_df[readiness_df["readiness_score"] >= 75].shape[0]
- 
+
+        total_days = low + moderate + high
+        low_pct = (low / total_days) * 100 if total_days > 0 else 0
+        moderate_pct = (moderate / total_days) * 100 if total_days > 0 else 0
+        high_pct = (high / total_days) * 100 if total_days > 0 else 0
+
         st.markdown("### 🔍 Summary of readiness levels")
         critical_days = readiness_summary[readiness_summary["readiness_score"] < 60]
         if not critical_days.empty:
@@ -535,14 +540,26 @@ elif st.session_state.active_tab == "Squad Overview":
         else:
             st.success("✅ No critical readiness days detected.")
 
-        st.success(f"🟩 Number of days with high readiness : {high}")
-        st.warning(f"🟧 Number of days with moderate readiness : {moderate}")
-        st.error(f"🟥 Number of days with low readiness : {low}")
+        st.success(f"🟩 High readiness days: {high} days ({high_pct:.1f}%)")
+        st.warning(f"🟧 Moderate readiness days: {moderate} days ({moderate_pct:.1f}%)")
+        st.error(f"🟥 Low readiness days: {low} days ({low_pct:.1f}%)")
  
         st.markdown("### 🧍‍♂️ Players Below 60% Readiness")
         if not readiness_df.empty and "readiness_score" in readiness_df.columns:
             player_warnings = readiness_df[readiness_df["readiness_score"] < 60]
             if not player_warnings.empty:
+                filter_cols = st.columns(2)
+                with filter_cols[0]:
+                    selected_player_filter = st.selectbox("Select Player", options=["All"] + sorted(player_warnings["player_id"].unique()), index=0)
+                with filter_cols[1]:
+                    selected_month = st.selectbox("Select Month", options=["All"] + sorted(player_warnings["date"].dt.to_period("M").astype(str).unique()), index=0)
+
+                filtered_data = player_warnings.copy()
+                if selected_player_filter != "All":
+                    filtered_data = filtered_data[filtered_data["player_id"] == selected_player_filter]
+                if selected_month != "All":
+                    filtered_data = filtered_data[filtered_data["date"].dt.to_period("M").astype(str) == selected_month]
+
                 expected_cols = ["date", "player_id", "recovery_score", "distance", "readiness_score"]
                 for col in expected_cols:
                     if col not in player_warnings.columns:
@@ -550,7 +567,7 @@ elif st.session_state.active_tab == "Squad Overview":
                             player_warnings["player_id"] = np.random.choice([7, 10, 22], size=len(player_warnings))
                         else:
                             player_warnings[col] = np.nan
-                st.dataframe(player_warnings[expected_cols].sort_values("date", ascending=False))
+                st.dataframe(filtered_data[expected_cols].sort_values("date", ascending=False))
             else:
                 st.success("✅ All players above critical readiness thresholds.")
 
