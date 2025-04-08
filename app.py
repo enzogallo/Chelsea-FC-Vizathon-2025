@@ -798,16 +798,65 @@ elif st.session_state.active_tab == "Recovery":
         else:
             st.success(f"🟩 Players are well recovered this week ({latest_weekly_score:.1f}%).")
 
-        st.subheader("🧍‍♂️ Players With Low Recovery")
-        st.markdown("Identifies players under 60% recovery in the last 3 days.")
-        recent = recovery_data[recovery_data["date"] >= recovery_data["date"].max() - pd.Timedelta(days=3)]
-        low_scores = recent[recent["recovery_score"] < 60]
-        if not low_scores.empty:
-            expected_cols = ["date", "player_id", "recovery_score"]
-            available_cols = [col for col in expected_cols if col in low_scores.columns]
-            st.dataframe(low_scores[available_cols].sort_values("date", ascending=False))
+        st.subheader("📉 Simplified Recovery Trends")
+        st.markdown("Use this section to follow **player recovery evolution** in a more digestible format.")
+        # [Existing simplified trends code remains unchanged]
+        min_date = recovery_data["date"].min()
+        max_date = recovery_data["date"].max()
+        selected_range = st.date_input("📅 Select period", value=(max_date - timedelta(days=14), max_date), min_value=min_date, max_value=max_date, key="recovery_simplified_range")
+ 
+        if isinstance(selected_range, tuple) and len(selected_range) == 2:
+            start_date, end_date = selected_range
+            filtered_recovery = recovery_data[
+                (recovery_data["date"] >= pd.to_datetime(start_date)) &
+                (recovery_data["date"] <= pd.to_datetime(end_date))
+            ]
         else:
-            st.success("✅ No players under recovery threshold in last 3 days.")
+            filtered_recovery = recovery_data
+ 
+        smoothed = (
+            filtered_recovery
+            .groupby(["date", "player_id"])["recovery_score"]
+            .mean()
+            .reset_index()
+        )
+ 
+        available_players = sorted(smoothed["player_id"].unique())
+        selected_players = st.multiselect("👤 Players to display", options=available_players, default=available_players, key="recovery_simplified_multiselect_2")
+ 
+        smoothed = smoothed[smoothed["player_id"].isin(selected_players)]
+ 
+        if not smoothed.empty:
+            fig_simple = px.line(
+                smoothed,
+                x="date",
+                y="recovery_score",
+                color="player_id",
+                markers=True,
+                title="📈 Recovery Score per Day",
+                labels={"recovery_score": "Recovery (%)", "date": "Date", "player_id": "Player"}
+            )
+            fig_simple.update_layout(height=600, width=1000)
+            st.plotly_chart(fig_simple, use_container_width=True, key="recovery_simplified_chart_2")
+        else:
+            st.info("No recovery data available for the selected period or players.")
+
+        st.subheader("🧍‍♂️ Players With Low Recovery")
+        st.markdown("Visual summary of average recovery over the last 3 days per player.")
+        recent = recovery_data[recovery_data["date"] >= recovery_data["date"].max() - pd.Timedelta(days=3)]
+        avg_recovery = recent.groupby("player_id")["recovery_score"].mean().reset_index()
+        if not avg_recovery.empty:
+            for _, row in avg_recovery.iterrows():
+                avg = row["recovery_score"]
+                player = row["player_id"]
+                color = "red" if avg < 60 else "orange" if avg < 75 else "green"
+                card(title=f"Player {PLAYER_NAMES.get(player, player)}", text=f"Avg Recovery: {avg:.1f}%", styles={
+                    "card": {"background-color": color, "padding": "1rem", "border-radius": "8px", "margin": "0.5rem"},
+                    "title": {"font-size": "20px", "font-weight": "bold"},
+                    "text": {"font-size": "16px"}
+                })
+        else:
+            st.success("✅ No recovery data available for the last 3 days.")
 
         st.subheader("📉 Simplified Recovery Trends")
         st.markdown("Use this section to follow **player recovery evolution** in a more digestible format.")
@@ -836,7 +885,7 @@ elif st.session_state.active_tab == "Recovery":
  
         # Sélection de joueurs à afficher
         available_players = sorted(smoothed["player_id"].unique())
-        selected_players = st.multiselect("👤 Players to display", options=available_players, default=available_players)
+        selected_players = st.multiselect("👤 Players to display", options=available_players, default=available_players, key="recovery_simplified_multiselect")
  
         smoothed = smoothed[smoothed["player_id"].isin(selected_players)]
  
@@ -897,10 +946,12 @@ elif st.session_state.active_tab == "Recovery":
                 trendline="ols",
                 title=f"Player {pid} – Distance vs Recovery",
                 labels={"distance": "Distance (m)", "recovery_score": "Recovery (%)"},
-                opacity=0.7
+                opacity=0.3
             )
+            fig.update_traces(selector=dict(mode='lines'), line=dict(width=4))
             fig.update_layout(height=400)
             st.plotly_chart(fig, use_container_width=True)
+            st.markdown("**Focus on the line** – it shows the relationship between distance and recovery. Dots are daily sessions.")
     
             # Pente de la tendance
             model = np.polyfit(player_subset["distance"], player_subset["recovery_score"], 1)
@@ -1407,7 +1458,21 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
 
         selected_metric = st.selectbox("📊 Select intensity threshold", options=accel_columns, format_func=format_accel_label)
 
-        summary = gps_data[gps_data[selected_metric].notnull()].groupby("player_id")[selected_metric].sum().reset_index()
+        min_date = gps_data["date"].min()
+        max_date = gps_data["date"].max()
+        selected_range = st.date_input("📅 Select period", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+        if isinstance(selected_range, tuple) and len(selected_range) == 2:
+            start_date, end_date = selected_range
+            gps_data = gps_data[(gps_data["date"] >= pd.to_datetime(start_date)) & (gps_data["date"] <= pd.to_datetime(end_date))]
+
+        display_mode = st.selectbox("🧮 Display as", ["Total", "Average per session"])
+
+        if display_mode == "Average per session":
+            session_level = gps_data.groupby(["player_id", "date"])[selected_metric].sum().reset_index()
+            summary = session_level.groupby("player_id")[selected_metric].mean().reset_index()
+        else:
+            summary = gps_data.groupby("player_id")[selected_metric].sum().reset_index()
+
         summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
         summary = summary.sort_values(selected_metric, ascending=False)
 
@@ -1418,7 +1483,7 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
             summary,
             x="Player",
             y=selected_metric,
-            title=f"Total Accelerations/Decelerations Above Threshold",
+            title=f"{'Average per Session' if display_mode == 'Average per session' else 'Total'} Accelerations/Decelerations Above Threshold",
             labels={selected_metric: "Effort Count"},
             text_auto=True
         )
