@@ -71,7 +71,7 @@ def custom_header():
             if st.button("⚽ CFC Data Center", key="home_nav_button"):
                 st.session_state.active_tab = "Home"
                 st.rerun()
-        st.caption("© CFC Data Center by Enzo Gallo, 2025")
+        st.caption("© Enzo Gallo, 2025")
     st.markdown("---")
 
     selected_tab = option_menu(
@@ -578,6 +578,15 @@ elif st.session_state.active_tab == "Squad Overview":
 
 elif st.session_state.active_tab == "Load Demand":
     custom_header()
+    player_list = gps_data["player_id"].dropna().unique()
+    selected_player = st.selectbox("Select Player for Individual View", options=["All"] + list(map(str, sorted(player_list))), key="player_filter_load")
+    if selected_player != "All":
+        selected_player = int(selected_player)
+        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
+        player_data = gps_data[gps_data["player_id"] == selected_player]
+    else:
+        player_data = gps_data
+
     st.header("📈 Match Load Analysis")
 
     with st.expander("➕ Add Training Load Entry"):
@@ -602,15 +611,6 @@ elif st.session_state.active_tab == "Load Demand":
                 updated_gps.to_csv(gps_path, index=False)
                 st.success("✅ Training load entry added successfully.")
                 st.rerun()
-
-    player_list = gps_data["player_id"].dropna().unique()
-    selected_player = st.selectbox("Select Player for Individual View", options=["All"] + list(map(str, sorted(player_list))), key="player_filter_load")
-    if selected_player != "All":
-        selected_player = int(selected_player)
-        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
-        player_data = gps_data[gps_data["player_id"] == selected_player]
-    else:
-        player_data = gps_data
 
     if not player_data.empty and "date" in player_data.columns:
         min_date = player_data["date"].min()
@@ -975,12 +975,12 @@ elif st.session_state.active_tab == "Physical Development":
     
 elif st.session_state.active_tab == "Biography":
     custom_header()
-    st.header("📇 Individual Development Plan (IDP)")
-
     player_options = sorted(gps_data["player_id"].dropna().unique())
     selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_bio")
     if selected_player != "All":
         selected_player = int(selected_player)
+
+    st.header("📇 Individual Development Plan (IDP)")
 
     # Charger données existantes
     dev_plan_path = "CFC Player Dev Plan.csv"
@@ -1147,12 +1147,11 @@ elif st.session_state.active_tab == "External Factors":
     
 elif st.session_state.active_tab == "Match Analysis":
     custom_header()
-    st.header("📍 Player Heatmap")
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_match")
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_match_analysis")
     if selected_player != "All":
         selected_player = int(selected_player)
-
+    st.header("📍 Player Heatmap")
     with st.expander("➕ Add Match Event"):
         with st.form("add_match_event_form"):
             match_date = st.date_input("📅 Match Date", value=datetime.today())
@@ -1266,10 +1265,9 @@ elif st.session_state.active_tab == "Match Analysis":
 
         match_events = event_data[event_data["match_date"] == selected_match]
 
-        match_players = sorted(match_events["player_id"].dropna().unique())
-        selected_player_replay = st.selectbox("Select Player for Timeline Replay", options=match_players)
+        # Removed duplicate selectbox for player selection; using selected_player from Match Analysis
 
-        player_events = match_events[match_events["player_id"] == selected_player_replay]
+        player_events = match_events[match_events["player_id"] == selected_player]
 
         if not player_events.empty:
             player_events = player_events.sort_values("timestamp")
@@ -1290,7 +1288,7 @@ elif st.session_state.active_tab == "Match Analysis":
                     y="event_type",
                     color="event_type",
                     hover_data=["timestamp", "x", "y"],
-                    title=f"📊 Event Timeline – Player {selected_player_replay}",
+                    title=f"📊 Event Timeline – Player {selected_player}",
                     labels={"timestamp": "Time", "event_type": "Event Type"}
                 )
                 fig_timeline.update_traces(marker=dict(size=12))
