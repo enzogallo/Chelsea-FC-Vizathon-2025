@@ -5,6 +5,7 @@ from streamlit_option_menu import option_menu
 import pandas as pd
 import plotly.express as px
 from plotly.io import to_image
+import plotly.graph_objects as go
 import os
 import numpy as np
 from datetime import datetime, timedelta
@@ -603,6 +604,7 @@ elif st.session_state.active_tab == "Load Demand":
         player_data = gps_data[gps_data["player_id"] == selected_player]
     else:
         player_data = gps_data
+    player_data = player_data[player_data["distance"].notnull()]
 
     st.header("📈 Match Load Analysis")
 
@@ -638,26 +640,55 @@ elif st.session_state.active_tab == "Load Demand":
             start_date, end_date = selected_range
             player_data = player_data[(player_data["date"] >= pd.to_datetime(start_date)) & (player_data["date"] <= pd.to_datetime(end_date))]
 
-    st.subheader("🎯 Filter by Player")
-    st.info("⚠️ Null distances have been excluded as they correspond to non-participation (players not lined up)..")
+    st.subheader("🎯 Player Filter")
+    st.info("⚠️ Sessions with null distance values were excluded, as they indicate non-participation or missing data.")
     
-    # Distance Covered Over Time with Rolling Average
+    # Scatter plot Distance avec moyenne et tendance mensuelle
     if "distance" in player_data.columns:
         player_data_sorted = player_data.sort_values("date")
-        player_data_sorted["rolling_distance"] = player_data_sorted["distance"].rolling(window=7, min_periods=1).mean()
         avg_distance = player_data_sorted["distance"].mean()
+        player_data_sorted["month"] = player_data_sorted["date"].dt.to_period("M").dt.to_timestamp()
 
-        fig_distance = px.line(
-            player_data_sorted,
-            x='date',
-            y=['distance', 'rolling_distance'],
-            title=f'Distance Covered Over Time – Player {selected_player}',
-            labels={'value': 'Distance (m)', 'date': 'Date', 'variable': 'Metric'}
+        # Moyenne par mois
+        monthly_avg = player_data_sorted.groupby("month")["distance"].mean().reset_index()
+
+        # Scatter + moyenne globale
+        fig_distance = go.Figure()
+
+        fig_distance.add_trace(go.Scatter(
+            x=player_data_sorted["date"],
+            y=player_data_sorted["distance"],
+            mode="markers",
+            name="Distance par session",
+            marker=dict(size=6, color="blue"),
+            hovertemplate="Date: %{x}<br>Distance: %{y} m"
+        ))
+
+        fig_distance.add_trace(go.Scatter(
+            x=monthly_avg["month"],
+            y=monthly_avg["distance"],
+            mode="lines+markers",
+            name="Moyenne mensuelle",
+            line=dict(color="orange", dash="dash"),
+            marker=dict(size=8)
+        ))
+
+        fig_distance.add_hline(
+            y=avg_distance,
+            line_dash="dot",
+            annotation_text=f"Moyenne globale: {avg_distance:.1f} m",
+            line_color="green"
         )
-        fig_distance.update_layout(height=800, width=1000)
-        fig_distance.add_hline(y=avg_distance, line_dash="dot", annotation_text=f"Moyenne: {avg_distance:.1f} m", line_color="green")
+
+        fig_distance.update_layout(
+        title="📊 Distance per Session with Monthly Trend",
+            xaxis_title="Date",
+            yaxis_title="Distance (m)",
+            height=600
+        )
+
         st.plotly_chart(fig_distance, use_container_width=True)
-        st.caption("Tracks the player's total distance covered over time, with a rolling average to highlight physical load trends.")
+        st.caption("Each point = one session. Green line = overall average. Orange line = monthly trend.")
 
     # Acceleration/Deceleration per Session with Mean Line
     accel_cols = [col for col in player_data.columns if "accel_decel" in col]
@@ -1376,11 +1407,11 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
 
         selected_metric = st.selectbox("📊 Select intensity threshold", options=accel_columns, format_func=format_accel_label)
 
-        summary = gps_data.groupby("player_id")[selected_metric].sum().reset_index()
+        summary = gps_data[gps_data[selected_metric].notnull()].groupby("player_id")[selected_metric].sum().reset_index()
         summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
         summary = summary.sort_values(selected_metric, ascending=False)
 
-        st.subheader("🏃 High-Intensity Efforts by Player")
+        st.subheader("🏃 High-Intensity Efforts per Player")
         st.dataframe(summary, use_container_width=True)
 
         fig_summary = px.bar(
@@ -1394,9 +1425,9 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
         fig_summary.update_layout(height=500)
         st.plotly_chart(fig_summary, use_container_width=True)
 
-        st.markdown("### 📘 Coach Insight")
+        st.markdown("### 📘 Coach Insights")
         st.markdown("""
-        - Players with high counts have been **explosively involved**
-        - Use this to **monitor progression** or **compare sessions**
-        - ⚠️ Very low counts may indicate underperformance or limited participation
+        - Players with higher effort counts were more involved in explosive actions.
+        - Use this metric to track conditioning or compare match/training impact.
+        - ⚠️ Very low counts might indicate reduced involvement or performance drop.
         """)
