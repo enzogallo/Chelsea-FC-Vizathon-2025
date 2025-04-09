@@ -668,7 +668,7 @@ elif st.session_state.active_tab == "Load Demand":
             x=player_data_sorted["date"],
             y=player_data_sorted["distance"],
             mode="markers",
-            name="Distance par session",
+            name="Distance per session",
             marker=dict(size=6, color="blue"),
             hovertemplate="Date: %{x}<br>Distance: %{y} m"
         ))
@@ -677,7 +677,7 @@ elif st.session_state.active_tab == "Load Demand":
             x=monthly_avg["month"],
             y=monthly_avg["distance"],
             mode="lines+markers",
-            name="Moyenne mensuelle",
+            name="Monthly average",
             line=dict(color="orange", dash="dash"),
             marker=dict(size=8)
         ))
@@ -685,7 +685,7 @@ elif st.session_state.active_tab == "Load Demand":
         fig_distance.add_hline(
             y=avg_distance,
             line_dash="dot",
-            annotation_text=f"Moyenne globale: {avg_distance:.1f} m",
+            annotation_text=f"Overall average: {avg_distance:.1f} m",
             line_color="green"
         )
 
@@ -715,7 +715,7 @@ elif st.session_state.active_tab == "Load Demand":
                 )
             fig_accel.update_layout(height=800, width=1000)
             mean_val = player_data[col].mean()
-            fig_accel.add_hline(y=mean_val, line_dash="dot", line_color="orange", annotation_text=f"Moyenne: {mean_val:.1f}")
+            fig_accel.add_hline(y=mean_val, line_dash="dot", line_color="orange", annotation_text=f"Average: {mean_val:.1f}")
             st.plotly_chart(fig_accel, use_container_width=True)
             st.caption("""
             Track explosive movements across sessions:
@@ -748,7 +748,7 @@ elif st.session_state.active_tab == "Load Demand":
             )
         fig_opposition.update_layout(height=800, width=1000)
         avg_opp = opposition_summary["distance"].mean()
-        fig_opposition.add_hline(y=avg_opp, line_dash="dot", annotation_text=f"Moyenne: {avg_opp:.1f} m", line_color="gray")
+        fig_opposition.add_hline(y=avg_opp, line_dash="dot", annotation_text=f"Average: {avg_opp:.1f} m", line_color="gray")
         st.plotly_chart(fig_opposition, use_container_width=True)
         st.caption("Highlights the average distance covered against each opponent — helps understand match demands.")
     
@@ -1198,7 +1198,7 @@ elif st.session_state.active_tab == "Injury":
                     x="date",
                     y="injury_status",
                     color="injury_status",
-                    title="📅 Injury history",
+                    title="",
                     labels={"date": "Date", "injury_status": "Injury Type"}
                 )
                 fig_timeline.update_traces(marker=dict(size=12))
