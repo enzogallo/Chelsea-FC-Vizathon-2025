@@ -249,7 +249,10 @@ if st.session_state.active_tab == "Home":
                     <h1 style="margin:0; font-size:1.8rem;">CFC Data Center</h1>
             </div>
             <p style="margin-top:0rem; font-size:0.9rem;">
-                From data to decisions – a custom-built platform powering Chelsea FC’s performance strategy. © Designed by Enzo Gallo, 2025.
+                From data to decisions – a custom-built platform powering Chelsea FC’s performance strategy
+            </p>
+            <p style="margin-top:-0.7rem; font-size:0.7rem;">
+                © Enzo Gallo 2025
             </p>
         </div>
     </div>
