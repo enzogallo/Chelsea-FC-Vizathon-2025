@@ -73,7 +73,6 @@ def custom_header():
                 st.session_state.active_tab = "Home"
                 st.rerun()
         st.caption("© Enzo Gallo, 2025")
-    st.markdown("---")
 
     selected_tab = option_menu(
         menu_title=None,
@@ -526,6 +525,13 @@ elif st.session_state.active_tab == "Squad Overview":
         )
         
         st.plotly_chart(fig, use_container_width=True)
+
+        st.caption("""
+        Color zones indicate different readiness levels:
+        🟩 Green (75-100%): Optimal readiness
+        🟧 Orange (60-75%): Moderate readiness - monitor carefully
+        🟥 Red (0-60%): Low readiness - consider load adaptation
+        """)
  
         # Résumé par niveau
         low = readiness_df[readiness_df["readiness_score"] < 60].shape[0]
@@ -691,8 +697,12 @@ elif st.session_state.active_tab == "Load Demand":
         )
 
         st.plotly_chart(fig_distance, use_container_width=True)
-        st.caption("Each point = one session. Green line = overall average. Orange line = monthly trend.")
-
+        st.caption("""
+        This scatter plot shows the distance covered in each session over time.
+        - Blue dots: Individual session values
+        - Orange line: Monthly trend showing load evolution
+        - Green line: Overall average serving as a reference point
+        """)
     # Acceleration/Deceleration per Session with Mean Line
     accel_cols = [col for col in player_data.columns if "accel_decel" in col]
     if accel_cols:
@@ -707,8 +717,12 @@ elif st.session_state.active_tab == "Load Demand":
             mean_val = player_data[col].mean()
             fig_accel.add_hline(y=mean_val, line_dash="dot", line_color="orange", annotation_text=f"Moyenne: {mean_val:.1f}")
             st.plotly_chart(fig_accel, use_container_width=True)
-            st.caption("Monitors explosive efforts through acceleration/deceleration counts, indicating session intensity.")
-
+            st.caption("""
+            Track explosive movements across sessions:
+            - Each peak represents high-intensity moments
+            - Orange average line helps identify if player maintains expected intensity
+            - Useful for monitoring explosive capacity and fatigue
+            """)
     # Total Distance vs Peak Speed with Trendline
     if "peak_speed" in player_data.columns:
         fig_gps = px.scatter(
@@ -792,6 +806,13 @@ elif st.session_state.active_tab == "Recovery":
         fig_weekly.add_hrect(y0=50, y1=70, fillcolor="orange", opacity=0.1, line_width=0)
         fig_weekly.add_hrect(y0=70, y1=100, fillcolor="green", opacity=0.1, line_width=0)
         st.plotly_chart(fig_weekly, use_container_width=True)
+
+        st.caption("""
+        Weekly recovery trend interpretation:
+        - Upward trend: Improving recovery capacity
+        - Downward trend: Potential accumulation of fatigue
+        - Colored zones help identify critical periods
+        """)
 
         latest_weekly_score = weekly_avg["recovery_score"].iloc[-1]
         if latest_weekly_score < 50:
@@ -1307,6 +1328,13 @@ elif st.session_state.active_tab == "Match Analysis":
         pitch.kdeplot(filtered_events["x"], filtered_events["y"], ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
         st.pyplot(fig, use_container_width=False)
 
+        st.caption("""
+        Heatmap interpretation:
+        - Darker red areas: Higher concentration of player activity
+        - Lighter areas: Less frequent presence
+        - Useful for understanding positional tendencies and movement patterns
+        """)
+
     with col2:
         st.markdown("#### 📍 Event Map by Type")
         st.markdown("🎯 Filter by Event Type")
@@ -1353,6 +1381,14 @@ elif st.session_state.active_tab == "Match Analysis":
         ]
         ax2.legend(handles=legend_elements, title="Event Type", loc="upper right", fontsize="small", title_fontsize="small")
         st.pyplot(fig2, use_container_width=False)
+
+        st.caption("""
+        Event distribution analysis:
+        - Circles (●): Successful actions
+        - Crosses (✖): Unsuccessful attempts
+        - Colors differentiate event types
+        - Position on pitch shows tactical patterns
+        """)
 
     st.subheader("🕒 Match Replay Timeline")
     st.markdown("Animated replay of key events over time for a selected match and player.")
@@ -1492,6 +1528,13 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
         )
         fig_summary.update_layout(height=500)
         st.plotly_chart(fig_summary, use_container_width=True)
+
+        st.caption("""
+        High-intensity effort comparison:
+        - Higher bars indicate more explosive actions
+        - Compare players' workload at same intensity threshold
+        - Helps identify players who might need specific conditioning
+        """)
 
         st.markdown("### 📘 Coach Insights")
         st.markdown("""
