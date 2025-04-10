@@ -111,6 +111,7 @@ def custom_header():
                 "margin": "0px",
                 "color": "white",
                 "padding": "10px 15px",
+                "font-family": "Poppins, sans-serif",
             },
             "nav-link-selected": {"background-color": "#012d5e"},
         }
@@ -161,12 +162,14 @@ def render_home():
                         "background-color": "transparent",
                         "backdrop-filter": "none",
                         "border": "none",
-                        "color": "white"
+                        "color": "white",
+                        "font-family": "Poppins, sans-serif"
                     },
                     "title": {
                         "font-size": "22px",
                         "font-weight": "bold",
-                        "color": "white"
+                        "color": "white",
+                        "font-family": "Poppins, sans-serif"
                     },
                     "image": {
                         "object-fit": "cover"
@@ -252,12 +255,12 @@ if st.session_state.active_tab == "Home":
         <div style="text-align:center;">
             <div style="display:flex; align-items:center; justify-content:center; gap:1rem;">
                     <img src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" alt="Chelsea Logo" style="height:70px; padding:0.5rem 0.5rem;" />
-                    <h1 style="margin:0; font-size:1.8rem;">CFC Data Center</h1>
+                    <h1 style="font-family: 'Poppins', sans-serif; margin:0; font-size:1.8rem;">CFC Data Center</h1>
             </div>
-            <p style="margin-top:0rem; font-size:0.9rem;">
+            <p style="font-family: 'Poppins', sans-serif; margin-top:0rem; font-size:0.9rem;">
                 From data to decisions – a custom-built platform powering Chelsea FC’s performance strategy
             </p>
-            <p style="margin-top:-0.7rem; font-size:0.7rem;">
+            <p style="font-family: 'Poppins', sans-serif; margin-top:-0.7rem; font-size:0.7rem;">
                 © Enzo Gallo 2025
             </p>
         </div>
@@ -853,8 +856,8 @@ elif st.session_state.active_tab == "Recovery":
                 player = row["player_id"]
                 color = "red" if avg < 60 else "orange" if avg < 75 else "green"
                 card(title=f"Player {PLAYER_NAMES.get(player, player)}", text=f"Avg Recovery: {avg:.1f}%", styles={
-                    "card": {"background-color": color, "padding": "1rem", "border-radius": "8px", "margin": "0.5rem"},
-                    "title": {"font-size": "20px", "font-weight": "bold"},
+                    "card": {"background-color": color, "padding": "1rem", "border-radius": "8px", "margin": "0.5rem", "font-family": "Poppins, sans-serif"},
+                    "title": {"font-size": "20px", "font-weight": "bold", "font-family": "Poppins, sans-serif"},
                     "text": {"font-size": "16px"}
                 })
         else:
