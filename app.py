@@ -79,15 +79,16 @@ def custom_header():
                 background-color: #034694;
                 color: white;
                 font-weight: bold;
-                padding: 0.75rem 2rem;
-                border-radius: 0.5rem;
-                border: none;
-                font-size: 1.1rem;
-                margin-top: 0.5rem;
-                cursor: pointer;
+                padding: 0.75rem 2.5rem;
+                border-radius: 1rem;
+                border: 2px solid #1a73e8;
+                font-size: 1.2rem;
+                box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+                transition: all 0.3s ease;
             }
             button:hover {
                 background-color: #012d5e;
+                box-shadow: 0px 6px 14px rgba(0, 0, 0, 0.4);
             }
         """):
             if st.button("⚽ CFC Data Center", key="home_nav_button"):
@@ -179,26 +180,6 @@ def render_home():
                 st.session_state.active_tab = card_data["tab"]
                 st.rerun()
 
-def render_match_analysis():
-    st.header("⚽ Match Events Analysis")
-    
-    event_data = pd.read_csv("CFC Match Events Data.csv")
-    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
-
-    if selected_player != "All":
-        filtered_events = event_data[event_data["player_id"] == selected_player]
-    else:
-        filtered_events = event_data
-
-    st.subheader("📍 Match Events Heatmap")
-    fig, ax = plt.subplots(figsize=(6, 4))
-    pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
-    pitch.draw(ax=ax)
-    pitch.scatter(filtered_events["x"], filtered_events["y"], ax=ax, edgecolor='black', alpha=0.7, s=80)
-    st.pyplot(fig)
-
-    st.subheader("📋 Event Table")
-    st.dataframe(filtered_events.sort_values("timestamp"))
 
 def local_css(file_name):
     with open(file_name) as f:
@@ -580,44 +561,17 @@ elif st.session_state.active_tab == "Squad Overview":
         st.warning(f"🟧 Moderate readiness days: {moderate} days ({moderate_pct:.1f}%)")
         st.error(f"🟥 Low readiness days: {low} days ({low_pct:.1f}%)")
  
-        st.markdown("### 🧍‍♂️ Players Below 60% Readiness")
-        if not readiness_df.empty and "readiness_score" in readiness_df.columns:
-            player_warnings = readiness_df[readiness_df["readiness_score"] < 60]
-            if not player_warnings.empty:
-                filter_cols = st.columns(2)
-                with filter_cols[0]:
-                    selected_player_filter = st.selectbox("Select Player", options=["All"] + sorted(player_warnings["player_id"].unique()), index=0)
-                with filter_cols[1]:
-                    selected_month = st.selectbox("Select Month", options=["All"] + sorted(player_warnings["date"].dt.to_period("M").astype(str).unique()), index=0)
-
-                filtered_data = player_warnings.copy()
-                if selected_player_filter != "All":
-                    filtered_data = filtered_data[filtered_data["player_id"] == selected_player_filter]
-                if selected_month != "All":
-                    filtered_data = filtered_data[filtered_data["date"].dt.to_period("M").astype(str) == selected_month]
-
-                expected_cols = ["date", "player_id", "recovery_score", "distance", "readiness_score"]
-                for col in expected_cols:
-                    if col not in player_warnings.columns:
-                        if col == "player_id":
-                            player_warnings["player_id"] = np.random.choice([7, 10, 22], size=len(player_warnings))
-                        else:
-                            player_warnings[col] = np.nan
-                st.dataframe(filtered_data[expected_cols].sort_values("date", ascending=False))
-            else:
-                st.success("✅ All players above critical readiness thresholds.")
-
-        # Affichage des données brutes pour référence
-        with st.expander("📋 View detailed data"):
-            required_cols = ["date", "distance", "recovery_score", "readiness_score"]
-            for col in required_cols:
-                if col not in readiness_df.columns:
+        required_cols = ["date", "distance", "recovery_score", "readiness_score"]
+        for col in required_cols:
+            if col not in readiness_df.columns:
                     readiness_df[col] = np.nan
             styled_df = readiness_df[required_cols].style.applymap(
                 lambda v: 'background-color: #b30000; color: white' if isinstance(v, (int, float)) and v < 60 else 'color: white',
                 subset=["readiness_score"]
             )
-            st.dataframe(styled_df)
+            avg_readiness = readiness_df["readiness_score"].mean()
+        st.metric("Average Readiness", f"{avg_readiness:.1f}%")
+
         st.markdown("### 📘 Coach Interpretation")
         st.markdown("""
         - **Above 75%**: Players are fresh and ready – optimal training intensity possible.
@@ -677,6 +631,7 @@ elif st.session_state.active_tab == "Load Demand":
     
     # Scatter plot Distance avec moyenne et tendance mensuelle
     if "distance" in player_data.columns:
+        player_data = player_data[player_data["distance"] != 0]
         player_data_sorted = player_data.sort_values("date")
         avg_distance = player_data_sorted["distance"].mean()
         player_data_sorted["month"] = player_data_sorted["date"].dt.to_period("M").dt.to_timestamp()
@@ -1114,8 +1069,6 @@ elif st.session_state.active_tab == "Physical Development":
         💡 **Tip**: Use this data to adapt training programs based on individual weaknesses (e.g. mobility, strength).
         """)
 
-        st.subheader("📋 Raw Data Table")
-        st.dataframe(capability_data)
     else:
         st.warning("No physical development data available.")
     
@@ -1163,8 +1116,6 @@ elif st.session_state.active_tab == "Biography":
                 st.rerun()
 
     if not existing.empty:
-        st.markdown("### 📋 Development History")
-        st.dataframe(existing[["last_update", "long_term_goal", "dimensions", "status", "coach_notes"]])
     
         st.markdown("### 🥧 Overall Objective Completion")
         pie_data = existing["status"].value_counts().reset_index()
@@ -1283,13 +1234,6 @@ elif st.session_state.active_tab == "External Factors":
                     "note": note_text.strip()
                 })
                 st.success("✅ Note saved!")
-
-    if "external_notes" in st.session_state and st.session_state.external_notes:
-        st.markdown("### 📋 Coach Notes Summary")
-        notes_df = pd.DataFrame(st.session_state.external_notes)
-        st.dataframe(notes_df.sort_values("date", ascending=False), use_container_width=True)
-    else:
-        st.info("No external notes recorded yet.")
     
 elif st.session_state.active_tab == "Match Analysis":
     custom_header()
@@ -1541,8 +1485,6 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
         summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
         summary = summary.sort_values(selected_metric, ascending=False)
 
-        st.subheader("🏃 High-Intensity Efforts per Player")
-        st.dataframe(summary, use_container_width=True)
 
         fig_summary = px.bar(
             summary,
