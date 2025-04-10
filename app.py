@@ -29,6 +29,27 @@ from streamlit_card import card
 # ----------------------------
 st.set_page_config(page_title="CFC Data Center", layout="wide")
 
+def add_bg_from_local(image_file):
+    with open(image_file, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode()
+    
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/png;base64,{encoded_string}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+add_bg_from_local('images/background.png')
+
 PLAYER_NAMES = {7: "Sterling", 10: "Mudryk", 22: "Chilwell"}
 
 params = st.query_params
@@ -135,11 +156,16 @@ def render_home():
                         "border-radius": "12px",
                         "box-shadow": "0 4px 12px rgba(0,0,0,0.15)",
                         "margin-bottom": "-30px",
-                        "margin-top": "-30px"
+                        "margin-top": "-30px",
+                        "background-color": "transparent",
+                        "backdrop-filter": "none",
+                        "border": "none",
+                        "color": "white"
                     },
                     "title": {
                         "font-size": "22px",
-                        "font-weight": "bold"
+                        "font-weight": "bold",
+                        "color": "white"
                     },
                     "image": {
                         "object-fit": "cover"
@@ -588,7 +614,7 @@ elif st.session_state.active_tab == "Squad Overview":
                 if col not in readiness_df.columns:
                     readiness_df[col] = np.nan
             styled_df = readiness_df[required_cols].style.applymap(
-                lambda v: 'background-color: red' if isinstance(v, (int, float)) and v < 60 else '',
+                lambda v: 'background-color: #b30000; color: white' if isinstance(v, (int, float)) and v < 60 else 'color: white',
                 subset=["readiness_score"]
             )
             st.dataframe(styled_df)
@@ -648,9 +674,6 @@ elif st.session_state.active_tab == "Load Demand":
         if isinstance(selected_range, tuple) and len(selected_range) == 2:
             start_date, end_date = selected_range
             player_data = player_data[(player_data["date"] >= pd.to_datetime(start_date)) & (player_data["date"] <= pd.to_datetime(end_date))]
-
-    st.subheader("🎯 Player Filter")
-    st.info("⚠️ Sessions with null distance values were excluded, as they indicate non-participation or missing data.")
     
     # Scatter plot Distance avec moyenne et tendance mensuelle
     if "distance" in player_data.columns:
@@ -1318,6 +1341,10 @@ elif st.session_state.active_tab == "Match Analysis":
 
     with col1:
         st.markdown("#### 📍 Heatmap of Match Involvement")
+        st.markdown(f"""
+        {'All players' if selected_player == "All" else f'Player {PLAYER_NAMES.get(int(selected_player), selected_player)}'}'s match involvement
+        """)
+
         event_data = pd.read_csv("CFC Match Events Data.csv")
         event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
         filtered_events = event_data[event_data["player_id"] == selected_player] if selected_player != "All" else event_data
@@ -1337,7 +1364,6 @@ elif st.session_state.active_tab == "Match Analysis":
 
     with col2:
         st.markdown("#### 📍 Event Map by Type")
-        st.markdown("🎯 Filter by Event Type")
 
         available_types = filtered_events["event_type"].dropna().unique().tolist()
         default_types = ["shot"] if "shot" in available_types else [available_types[0]] if available_types else []
