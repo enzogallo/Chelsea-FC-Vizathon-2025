@@ -492,8 +492,14 @@ if st.session_state.active_tab == "Home":
 elif st.session_state.active_tab == "Physical fitness":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_squad")
-    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
+    selected_name = st.selectbox(
+        "👤 Select a player",
+        options=["All"] + list(id_to_name.values()),
+        format_func=lambda x: x,
+        key="player_filter_squad"
+    )
+
+    selected_player = name_to_id.get(selected_name, "All") if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
         capability_data = capability_data[capability_data["player_id"] == selected_player]
@@ -507,20 +513,19 @@ elif st.session_state.active_tab == "Physical fitness":
     rec_latest = recovery_data_filtered.sort_values("date").groupby(["player_id", "date"]).tail(1)
     readiness_df = pd.merge(gps_latest, rec_latest, on=["player_id", "date"])
     readiness_df["readiness_score"] = readiness_df.apply(calculate_readiness, axis=1)
-    st.header("🧠 Squad Readiness Overview")
+    st.subheader("🧠 Squad Readiness Overview")
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
-    st.markdown("""
+        st.caption(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
+    st.caption("""
     This module helps you understand the **team's physical availability and fatigue levels**.
     It provides **daily insights** to help adjust your training load, plan recovery, and reduce injury risks.
     """)
-    st.markdown("### 🧾 What You’ll Learn")
-    st.markdown("- Daily and weekly readiness trend")
-    st.markdown("- Players at risk of underperformance")
-    st.markdown("- Relationship with training load and recovery")
+    st.markdown("##### 🧾 What You’ll Learn")
+    st.caption("- Daily and weekly readiness trend")
+    st.caption("- Players at risk of underperformance")
+    st.caption("- Relationship with training load and recovery")
  
     if not readiness_df.empty:
-        st.markdown("This section gives you an overview of the team's physical availability..")
 
         readiness_df["season"] = readiness_df["date"].apply(get_season)
         seasons_available = sorted(readiness_df["season"].unique(), reverse=True)
@@ -588,7 +593,7 @@ elif st.session_state.active_tab == "Physical fitness":
         moderate_pct = (moderate / total_days) * 100 if total_days > 0 else 0
         high_pct = (high / total_days) * 100 if total_days > 0 else 0
 
-        st.markdown("### 🔍 Summary of readiness levels")
+        st.markdown("#### 🔍 Summary of readiness levels")
         critical_days = readiness_summary[readiness_summary["readiness_score"] < 60]
         if not critical_days.empty:
             st.error(f"⚠️ {len(critical_days)} critical readiness days detected. Last one: {critical_days['date'].max().strftime('%Y-%m-%d')}")
@@ -610,8 +615,8 @@ elif st.session_state.active_tab == "Physical fitness":
             avg_readiness = readiness_df["readiness_score"].mean()
         st.metric("Average Readiness", f"{avg_readiness:.1f}%")
 
-        st.markdown("### 📘 Coach Interpretation")
-        st.markdown("""
+        st.markdown("#### 📘 Coach Interpretation")
+        st.caption("""
         - **Above 75%**: Players are fresh and ready – optimal training intensity possible.
         - **60-75%**: Moderate readiness – be cautious with volume and load.
         - **Below 60%**: Alert! Consider adapting drills or providing recovery.
@@ -624,22 +629,22 @@ elif st.session_state.active_tab == "Physical fitness":
 elif st.session_state.active_tab == "Load Demand":
     custom_header()
     player_list = gps_data["player_id"].dropna().unique()
-    selected_name = st.selectbox("Select Player for Individual View", options=["All"] + list(id_to_name.values()), key="player_filter_load")
+    selected_name = st.selectbox("Select Player for Individual View", options=["All"] + list(id_to_name.values()), format_func=lambda x: PLAYER_NAMES.get(int(x), "Unknown Player") if x != "All" else "All", key="player_filter_load")
     selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
-        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
+        st.caption(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
         player_data = gps_data[gps_data["player_id"] == selected_player]
     else:
         player_data = gps_data
     player_data = player_data[player_data["distance"].notnull()]
 
-    st.header("📈 Match Load Analysis")
+    st.subheader("📈 Match Load Analysis")
 
     with st.expander("➕ Add Training Load Entry"):
         with st.form("add_training_load_form"):
             ld_date = st.date_input("📅 Date", value=datetime.today(), key="ld_date")
-            ld_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="ld_player")
+            ld_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), format_func=lambda x: id_to_name.get(x, "Player not found"), key="ld_player")
             ld_distance = st.number_input("🏃 Distance (m)", min_value=0, value=5000, step=100, key="ld_distance")
             ld_oppo = st.text_input("🏟️ Opponent (optional)", key="ld_oppo")
             ld_accel = st.number_input("⚡ Accel/Decel (>2.5 m/s²)", min_value=0, step=1, value=12, key="ld_accel")
@@ -721,6 +726,13 @@ elif st.session_state.active_tab == "Load Demand":
     st.subheader("⚡ Acceleration/Deceleration Analysis")
     accel_cols = [col for col in player_data.columns if "accel_decel" in col]
     if accel_cols:
+        st.caption("""
+    ### 📏 Interpreting Acceleration Values
+    - **> 2.0 m/s²**: Light acceleration (e.g. jogging bursts)
+    - **> 2.5 m/s²**: Moderate acceleration (standard game movements)
+    - **> 3.0 m/s²**: High acceleration (explosive efforts, pressing, sprints)
+    - **> 3.5 m/s²**: Very high intensity (sprint duels, fast counters)    
+    """)
         selected_accel_col = st.radio("⚡ Select acceleration metric", accel_cols, key="accel_selector_load")
         fig_accel = px.line(
             player_data.sort_values("date"),
@@ -740,18 +752,35 @@ elif st.session_state.active_tab == "Load Demand":
         """)
     # Total Distance vs Peak Speed with Trendline
     if "peak_speed" in player_data.columns:
+        player_data = player_data.rename(columns={"peak_speed": "Sprint Max"})
         fig_gps = px.scatter(
                 player_data,
                 x="distance",
-                y="peak_speed",
+                y="Sprint Max",
                 trendline="ols",
                 hover_data=["date"],
-                title="Total Distance vs Peak Speed"
+                title="Total Distance vs Sprint Max",
+                labels={"distance": "Distance (m)", "Sprint Max": "Sprint Max (km/h)"}
             )
         fig_gps.update_layout(height=800, width=1000)
         st.plotly_chart(fig_gps, use_container_width=True)
-        st.caption("Shows correlation between total distance and peak speed — useful to assess efficiency of high-speed efforts.")
+        st.caption("Shows correlation between total distance and Sprint Max — useful to assess efficiency of high-speed efforts.")
 
+        st.caption("### 📘 Coach Interpretation")
+        st.caption("""
+        - **🔹 Sprint Max** = top speed reached during a session  
+        - **🔸 Distance** = total volume of running  
+
+        **🧠 How to read this chart:**  
+        - Each dot represents a training or match session  
+        - **High Sprint Max with low distance** → explosive player  
+        - **High distance with low Sprint Max** → endurance-focused player  
+        - The **trendline** shows how sprint ability evolves with workload  
+
+        **💡 Coaching tip:**  
+        - Decline in Sprint Max despite high distance may indicate fatigue  
+        - Helps optimize balance between volume and intensity based on player roles (e.g. fullbacks)  
+        """)
     # Average Distance by Opposition with Annotations
     if "opposition_full" in player_data.columns:
         opposition_summary = player_data.groupby("opposition_full")["distance"].mean().reset_index()
@@ -770,17 +799,28 @@ elif st.session_state.active_tab == "Load Demand":
 elif st.session_state.active_tab == "Recovery":
     custom_header()
     player_options = sorted(recovery_data["player_id"].dropna().unique())
-    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_recovery")
-    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
+    selected_name = st.selectbox(
+        "👤 Select a player",
+        options=["All"] + list(id_to_name.values()),
+        format_func=lambda x: x,
+        key="player_filter_recovery"
+    )
+
+    selected_player = name_to_id.get(selected_name, "All") if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
         recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
     
-    st.header("🛌 Recovery Overview")
+    recovery_data["season"] = recovery_data["date"].apply(get_season)
+    seasons_available = sorted(recovery_data["season"].unique(), reverse=True)
+    selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_recovery")
+    recovery_data = recovery_data[recovery_data["season"] == selected_season]
+    
+    st.subheader("🛌 Recovery Overview")
 
-    st.markdown("🧪 **Recovery Score** – subjective score (0-100) of how recovered a player feels after effort.")
+    st.caption("🧪 **Recovery Score** – subjective score (0-100) of how recovered a player feels after effort.")
 
-    st.markdown("""
+    st.caption("""
     This module helps you assess **player recovery status** and anticipate **readiness risks**.
     It allows you to track recovery trends, spot under-recovered athletes, and adjust training accordingly.
     """)
@@ -789,7 +829,7 @@ elif st.session_state.active_tab == "Recovery":
     with st.expander("➕ Add Recovery Entry"):
         with st.form("add_recovery_entry_form"):
             rec_date = st.date_input("📅 Recovery Date", value=datetime.today(), key="rec_date")
-            rec_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), key="rec_player")
+            rec_player = st.selectbox("👤 Player", options=sorted(gps_data["player_id"].dropna().unique()), format_func=lambda x: id_to_name.get(x, "Unknown Player"), key="rec_player")
             rec_score = st.slider("🧪 Recovery Score (0-100)", min_value=0, max_value=100, value=75, key="rec_score")
             rec_note = st.text_area("📝 Optional Notes", key="rec_note")
             submit_recovery = st.form_submit_button("Add Recovery Entry")
@@ -809,13 +849,9 @@ elif st.session_state.active_tab == "Recovery":
 
     # ---- Recovery Visuals ----
     if not recovery_data.empty:
-        st.subheader("📈 Weekly Average Recovery Trend")
-        st.markdown("Smooths out daily fluctuations to highlight overall team fatigue or freshness across weeks.")
+        st.markdown("##### 📈 Weekly Average Recovery Trend")
+        st.caption("Smooths out daily fluctuations to highlight overall team fatigue or freshness across weeks.")
 
-        recovery_data["season"] = recovery_data["date"].apply(get_season)
-        seasons_available = sorted(recovery_data["season"].unique(), reverse=True)
-        selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_recovery")
-        recovery_data = recovery_data[recovery_data["season"] == selected_season]
 
         recovery_data["week"] = pd.to_datetime(recovery_data["date"]).dt.to_period("W").dt.start_time
         weekly_avg = recovery_data.groupby("week")["recovery_score"].mean().reset_index()
@@ -845,42 +881,34 @@ elif st.session_state.active_tab == "Recovery":
             st.success(f"🟩 Players are well recovered this week ({latest_weekly_score:.1f}%).")
 
         st.subheader("📉 Simplified Recovery Trends")
-        st.markdown("Use this section to follow **player recovery evolution** in a more digestible format.")
+        st.caption("Use this section to follow **player recovery evolution** in a more digestible format.")
         # [Existing simplified trends code remains unchanged]
-        min_date = recovery_data["date"].min()
-        max_date = recovery_data["date"].max()
-        selected_range = st.date_input("📅 Select period", value=(max_date - timedelta(days=14), max_date), min_value=min_date, max_value=max_date, key="recovery_simplified_range")
- 
-        if isinstance(selected_range, tuple) and len(selected_range) == 2:
-            start_date, end_date = selected_range
-            filtered_recovery = recovery_data[
-                (recovery_data["date"] >= pd.to_datetime(start_date)) &
-                (recovery_data["date"] <= pd.to_datetime(end_date))
-            ]
-        else:
-            filtered_recovery = recovery_data
+        smoothed = recovery_data.copy()
  
         smoothed = (
-            filtered_recovery
+            smoothed
             .groupby(["date", "player_id"])["recovery_score"]
             .mean()
             .reset_index()
         )
  
         available_players = sorted(smoothed["player_id"].unique())
-        selected_players = st.multiselect("👤 Players to display", options=available_players, default=available_players, key="recovery_simplified_multiselect_2")
+        available_player_names = [id_to_name.get(pid, str(pid)) for pid in available_players]
+        selected_player_names = st.multiselect("👤 Players to display", options=available_player_names, default=available_player_names, key="recovery_simplified_multiselect_2")
+        selected_players = [pid for pid in available_players if id_to_name.get(pid, str(pid)) in selected_player_names]
  
         smoothed = smoothed[smoothed["player_id"].isin(selected_players)]
+        smoothed["player_name"] = smoothed["player_id"].map(id_to_name)
  
         if not smoothed.empty:
             fig_simple = px.line(
                 smoothed,
                 x="date",
                 y="recovery_score",
-                color="player_id",
+                color="player_name",
                 markers=True,
                 title="📈 Recovery Score per Day",
-                labels={"recovery_score": "Recovery (%)", "date": "Date", "player_id": "Player"}
+                labels={"recovery_score": "Recovery (%)", "date": "Date", "player_name": "Player"}
             )
             fig_simple.update_layout(height=600, width=1000)
             st.plotly_chart(fig_simple, use_container_width=True, key="recovery_simplified_chart_2")
@@ -888,25 +916,51 @@ elif st.session_state.active_tab == "Recovery":
             st.info("No recovery data available for the selected period or players.")
 
         st.subheader("🧍‍♂️ Players With Low Recovery")
-        st.markdown("Visual summary of average recovery over the last 3 days per player.")
+        st.caption("Visual summary of average recovery over the last 3 days per player.")
         recent = recovery_data[recovery_data["date"] >= recovery_data["date"].max() - pd.Timedelta(days=3)]
         avg_recovery = recent.groupby("player_id")["recovery_score"].mean().reset_index()
+
         if not avg_recovery.empty:
-            for _, row in avg_recovery.iterrows():
-                avg = row["recovery_score"]
-                player = row["player_id"]
-                color = "red" if avg < 60 else "orange" if avg < 75 else "green"
-                card(title=f"Player {PLAYER_NAMES.get(player, player)}", text=f"Avg Recovery: {avg:.1f}%", styles={
-                    "card": {"background-color": color, "padding": "1rem", "border-radius": "8px", "margin": "0.5rem", "font-family": "Poppins, sans-serif"},
-                    "title": {"font-size": "20px", "font-weight": "bold", "font-family": "Poppins, sans-serif"},
-                    "text": {"font-size": "16px"}
-                })
+            # Calculer le nombre de colonnes nécessaires
+            n_players = len(avg_recovery)
+            cols = st.columns(min(n_players, 3))  # Maximum 3 cartes par ligne
+            
+            # Distribuer les cartes dans les colonnes
+            for idx, row in avg_recovery.iterrows():
+                with cols[idx % 3]:  # Utiliser le modulo pour cycler entre les colonnes
+                    avg = row["recovery_score"]
+                    player = row["player_id"]
+                    color = "red" if avg < 60 else "orange" if avg < 75 else "green"
+                    card(
+                        title=f"{PLAYER_NAMES.get(player, player)}", 
+                        text=f"Avg Recovery: {avg:.1f}%", 
+                        styles={
+                            "card": {
+                                "background-color": color,
+                                "padding": "0.8rem",
+                                "border-radius": "8px",
+                                "margin": "0.3rem",
+                                "font-family": "Poppins, sans-serif",
+                                "min-width": "100%",  # Assurer que la carte prend toute la largeur de la colonne
+                                "height": "auto"
+                            },
+                            "title": {
+                                "font-size": "16px",
+                                "font-weight": "bold",
+                                "font-family": "Poppins, sans-serif",
+                                "margin-bottom": "0.3rem"
+                            },
+                            "text": {
+                                "font-size": "14px"
+                            }
+                        }
+                    )
         else:
             st.success("✅ No recovery data available for the last 3 days.")
 
 
     st.subheader("⚖️ Recovery vs Training Load")
-    st.markdown("""
+    st.caption("""
     This graph helps evaluate whether higher physical loads (distance) negatively impact a player’s recovery.
     
     💡 **How to read this:**  
@@ -924,13 +978,14 @@ elif st.session_state.active_tab == "Recovery":
         player_data = merged
         title = "All Players – Distance vs Recovery Score"
     
-    # Filtrage des données
-    trend_date_range = st.date_input("📅 Select date range for trend analysis", value=(recovery_data["date"].min(), recovery_data["date"].max()))
-    trend_selected_players = st.multiselect("👤 Select players for trend view", options=sorted(recovery_data["player_id"].unique()), default=sorted(recovery_data["player_id"].unique()))
-    if isinstance(trend_date_range, tuple) and len(trend_date_range) == 2:
-        start, end = trend_date_range
-        merged = merged[(merged["date"] >= pd.to_datetime(start)) & (merged["date"] <= pd.to_datetime(end))]
-    
+    # Filtrage des données par saison
+
+    player_ids = sorted(merged["player_id"].unique())
+    player_display_names = [id_to_name.get(pid, str(pid)) for pid in player_ids]
+    player_name_to_id = {id_to_name.get(pid, str(pid)): pid for pid in player_ids}
+    selected_names = st.multiselect("👤 Select players for trend view", options=player_display_names, default=player_display_names, key="recovery_trend_multiselect")
+    trend_selected_players = [player_name_to_id[name] for name in selected_names]
+
     merged = merged[merged["player_id"].isin(trend_selected_players)]
     
     if not merged.empty:
@@ -945,7 +1000,7 @@ elif st.session_state.active_tab == "Recovery":
                 x="distance",
                 y="recovery_score",
                 trendline="ols",
-                title=f"Player {pid} – Distance vs Recovery",
+                title=f"{PLAYER_NAMES.get(pid, str(pid))} – Distance vs Recovery",  # Modifié ici
                 labels={"distance": "Distance (m)", "recovery_score": "Recovery (%)"},
                 opacity=0.3
             )
@@ -959,18 +1014,18 @@ elif st.session_state.active_tab == "Recovery":
             slope = model[0]
     
             if slope < -0.005:
-                st.error(f"⚠️ Player {pid}: Recovery drops significantly with increased load.")
+                st.error(f"⚠️ {PLAYER_NAMES.get(pid, str(pid))} : Recovery drops significantly with increased load.")
             elif slope > 0.005:
-                st.success(f"✅ Player {pid}: Good recovery despite high load.")
+                st.success(f"✅ {PLAYER_NAMES.get(pid, str(pid))} : Good recovery despite high load.")
             else:
-                st.warning(f"🟨 Player {pid}: Slight or no correlation between distance and recovery.")
+                st.warning(f"🟨 {PLAYER_NAMES.get(pid, str(pid))} : Slight or no correlation between distance and recovery.")
     else:
         st.info("No recovery data available for selected players or dates.")
     
 elif st.session_state.active_tab == "Physical Development":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_physical")
+    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), format_func=lambda x: id_to_name.get(int(x), "Player not found") if x != "All" else "All", key="player_filter_physical")
     if selected_player != "All":
         selected_player = int(selected_player)
         capability_data = capability_data[capability_data["player_id"] == selected_player]
@@ -982,10 +1037,10 @@ elif st.session_state.active_tab == "Physical Development":
         capability_data = capability_data[capability_data["season"] == selected_season]
     st.header("🏋️ Physical Test Results")
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
+        st.caption(f"🔍 Showing data for **{PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
 
     if not capability_data.empty:
-        st.markdown("""
+        st.caption("""
         This section helps you **evaluate physical capabilities** of each player through objective testing.
         Tests include sprints, jumps, strength, and mobility benchmarks. 
 
@@ -995,7 +1050,7 @@ elif st.session_state.active_tab == "Physical Development":
         - Progress over time
         """)
 
-        st.subheader("📊 Performance vs Benchmark (by Movement Type)")
+        st.markdown("##### 📊 Performance vs Benchmark (by Movement Type)")
         if 'movement' in capability_data.columns and 'benchmarkpct' in capability_data.columns:
             fig_benchmark = px.bar(
                 capability_data,
@@ -1008,38 +1063,48 @@ elif st.session_state.active_tab == "Physical Development":
             )
             fig_benchmark.update_layout(yaxis_range=[0, 120])
             st.plotly_chart(fig_benchmark, use_container_width=True)
-            st.caption("Each bar shows the % of the benchmark reached by players for a specific movement (e.g., squat, sprint). Values >100% mean players exceeded the standard.")
+            fig_benchmark.update_traces(hovertemplate="%{y}%<br>Values above 100% show exceptional performance beyond the set benchmarks.")
+            st.caption("""
+            Each bar represents the percentage of the benchmark achieved by players for a specific movement, such as sprints or upper body strength. Values over 100% indicate that players exceeded the standard benchmarks, showcasing exceptional performance.
+            """)
             
             st.subheader("🌡️ Player vs Movement Heatmap")
-            st.markdown("Visual comparison of each player's performance per movement — helps identify strengths and weaknesses at a glance.")
+            st.caption("Visual comparison of each player's performance per movement — helps identify strengths and weaknesses at a glance.")
             
             if 'player_id' in capability_data.columns and 'movement' in capability_data.columns and 'benchmarkpct' in capability_data.columns:
                 heatmap_data = capability_data.pivot_table(index='player_id', columns='movement', values='benchmarkpct')
                 heatmap_data.index = heatmap_data.index.map(PLAYER_NAMES.get)
-                fig_heatmap, ax = plt.subplots(figsize=(12, 6))
+                fig_heatmap, ax = plt.subplots(figsize=(8, 4))
+                ax.set_facecolor('none')
                 sns.heatmap(heatmap_data, cmap="RdYlGn", annot=True, fmt=".0f", ax=ax, linewidths=.5, cbar_kws={"label": "% Benchmark"})
                 st.pyplot(fig_heatmap)
             else:
                 st.warning("❌ Required columns not found in capability_data.")
 
-        st.subheader("📊 Performance Distribution by Movement Type")
+        st.markdown("##### 📊 Performance Distribution by Movement Type")
         if {'movement', 'benchmarkpct'}.issubset(capability_data.columns):
+            capability_data = capability_data[capability_data['benchmarkpct'] > 1]
             fig_violin = px.violin(
                 capability_data,
                 x='movement',
                 y='benchmarkpct',
                 box=True,
                 points='all',
-                title='Violin Plot of Performance Distribution by Movement Type',
-                labels={'benchmarkpct': 'Benchmark (%)', 'movement': 'Movement Type'}
+                hover_data=['benchmarkpct'],
+                title='Enhanced Violin Plot of Performance Distribution by Movement Type',
+                labels={'benchmarkpct': 'Benchmark Percentage (%)', 'movement': 'Movement Type'}
             )
             fig_violin.update_layout(height=600, width=1000)
             st.plotly_chart(fig_violin, use_container_width=True)
             st.caption("Violin plot showing distribution of benchmark percentages per movement type, including box plot details.")
+            st.markdown("##### Understanding the Graph")
+            st.caption("""
+            This graph helps the coach understand how players are performing relative to established benchmarks for different physical movements. A performance above 100% means the player has exceeded the expected standards, which could be due to individual improvements or an exceptionally good performance session.
+            """)
         else:
             st.warning("Required data ('movement', 'benchmarkpct') not available to display performance distribution.")
             
-        st.subheader("📈 Benchmark Progression Over Time")
+        st.markdown("##### 📈 Benchmark Progression Over Time")
         required_columns = {"testdate", "benchmarkpct"}
         if required_columns.issubset(capability_data.columns):
             capability_data["testdate"] = pd.to_datetime(capability_data["testdate"], errors='coerce')
@@ -1047,17 +1112,45 @@ elif st.session_state.active_tab == "Physical Development":
             
             if not valid_data.empty:
                 fig_progress = px.scatter(
-                    valid_data,
-                    x="testdate",
-                    y="benchmarkpct",
-                    trendline="lowess",
-                    title="Benchmark Progression Over Time",
-                    labels={"benchmarkpct": "Benchmark (%)", "testdate": "Test Date"}
-                )
+                            valid_data,
+                            x="testdate",
+                            y="benchmarkpct",
+                            trendline="lowess",
+                            title="Progression of player performance relative to benchmark over time",
+                            labels={"benchmarkpct": "Percentage of Benchmark Achieved", "testdate": "Test Date"},
+                            hover_data=None
+                        )
                 fig_progress.add_hline(y=100, line_dash="dash", line_color="green",
-                                         annotation_text="Target Benchmark (100%)",
-                                         annotation_position="bottom right")
-                fig_progress.update_layout(height=600, width=1000)
+                                        annotation_text="Target Benchmark (100%)",
+                                        annotation_position="bottom right")
+                # Update hovertemplate for individual test data points
+                fig_progress.update_traces(
+                    selector=dict(mode='markers'),
+                    hovertemplate="Test Date: %{x}<br>Benchmark Achieved: %{y:.1f}%"
+                )
+                # Enhance the trendline appearance
+                fig_progress.update_traces(
+                    selector=dict(mode='lines'),
+                    line=dict(color='darkblue', width=4),
+                    hovertemplate="Trendline: %{y:.1f}%"
+                )
+                # Add annotation to explain the trendline
+                fig_progress.add_annotation(
+                    x=valid_data["testdate"].max(),
+                    y=valid_data["benchmarkpct"].mean(),
+                    text="Trendline: Overall Performance",
+                    showarrow=True,
+                    arrowhead=1,
+                    ax=-40,
+                    ay=-30,
+                    font=dict(color="darkblue", size=12)
+                )
+                fig_progress.update_layout(
+                    height=600,
+                    width=1000,
+                    legend_title="Data Type",
+                    legend=dict(itemsizing='constant')
+                )
                 st.plotly_chart(fig_progress, use_container_width=True)
                 st.caption("Scatter plot with lowess trendline showing progression of benchmark percentages over time.")
             else:
@@ -1065,8 +1158,8 @@ elif st.session_state.active_tab == "Physical Development":
         else:
             st.warning("Missing required data ('testdate', 'benchmarkpct') to display benchmark progression over time.")
 
-        st.subheader("📘 Coach Takeaways")
-        st.markdown("""
+        st.markdown("##### 📘 Coach Takeaways")
+        st.caption("""
         - Focus on movements **below 80%** – indicates room for physical development
         - Encourage maintenance or further improvement for **players above 100%**
         - Re-test regularly to track progress
@@ -1080,8 +1173,14 @@ elif st.session_state.active_tab == "Physical Development":
 elif st.session_state.active_tab == "Biography":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_bio")
-    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
+    selected_name = st.selectbox(
+        "👤 Select a player",
+        options=["All"] + list(id_to_name.values()),
+        format_func=lambda x: x,
+        key="player_filter_bio"
+    )
+
+    selected_player = name_to_id.get(selected_name, "All") if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
 
@@ -1097,7 +1196,7 @@ elif st.session_state.active_tab == "Biography":
     st.markdown("🎯 This section tracks long-term and short-term player development objectives.")
 
     player_id = selected_player
-    st.subheader(f"🧑‍🎓 Development Plan for Player {PLAYER_NAMES.get(player_id, player_id)}")
+    st.subheader(f"🧑‍🎓 Development Plan for {PLAYER_NAMES.get(player_id, player_id)}")
  
     existing = dev_data[dev_data["player_id"] == player_id].sort_values("last_update", ascending=False)
     with st.expander("➕ Add or Update Development Objective"):
@@ -1142,13 +1241,19 @@ elif st.session_state.active_tab == "Biography":
 elif st.session_state.active_tab == "Injury":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_injury")
-    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
+    selected_name = st.selectbox(
+        "👤 Select a player",
+        options=["All"] + list(id_to_name.values()),
+        format_func=lambda x: x,
+        key="player_filter_injury"
+    )
+
+    selected_player = name_to_id.get(selected_name, "All") if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
     st.header("❌ Injury & Medical Overview")
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
+        st.caption(f"🔍 Showing data for **{PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
         recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
     st.markdown("Tracking injuries and analyzing availability trends.")
 
@@ -1160,13 +1265,24 @@ elif st.session_state.active_tab == "Injury":
                 recovery_data["injury_status"].str.strip().str.lower().ne("none") &
                 recovery_data["injury_status"].notna()
             ]
-            if not filtered_injuries.empty:
-                st.success(f"✅ {len(filtered_injuries)} injuries detected in the dataset.")
-                fig_injury = px.histogram(filtered_injuries, x="injury_status", title="Breakdown of injuries")
-                fig_injury.update_layout(height=600, width=1000)
-                st.plotly_chart(fig_injury, use_container_width=True)
-            else:
-                st.info("✅ No injuries currently detected for the selected timeframe.")
+            injury_counts = filtered_injuries["injury_status"].value_counts().reset_index()
+            injury_counts.columns = ["injury_status", "count"]
+            
+            fig_injury = px.histogram(
+                injury_counts,
+                x="injury_status",
+                y="count",
+                title="Breakdown of injuries",
+                # Trier par fréquence décroissante
+                category_orders={"injury_status": injury_counts["injury_status"].tolist()}
+            )
+            fig_injury.update_layout(
+                height=600, 
+                width=1000,
+                xaxis_title="Injury Type",
+                yaxis_title="Number of Occurrences"
+            )
+            st.plotly_chart(fig_injury, use_container_width=True)
 
             st.subheader("📅 Injury Timeline")
             injury_timeline = recovery_data[
@@ -1214,20 +1330,26 @@ elif st.session_state.active_tab == "Injury":
 elif st.session_state.active_tab == "External Factors":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_external")
-    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
+    selected_name = st.selectbox(
+        "👤 Select a player",
+        options=["All"] + list(id_to_name.values()),
+        format_func=lambda x: x,
+        key="player_filter_external"
+    )
+
+    selected_player = name_to_id.get(selected_name, "All") if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
     st.header("🌍 External Context")
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
+        st.caption(f"🔍 Showing data for **{PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
     st.markdown("Capture external influences like fatigue, travel, or psychological state that might impact performance.")
 
     with st.expander("➕ Add External Note"):
         with st.form("external_note_form"):
             note_date = st.date_input("📅 Date concerned", value=datetime.now())
             player_options = ["Whole Team"] + [str(pid) for pid in sorted(gps_data["player_id"].dropna().unique())]
-            selected_player = st.selectbox("👤 Player concerned", options=player_options)
+            selected_player = st.selectbox("👤 Player concerned", options=player_options, format_func=lambda x: x if x=="Whole Team" else id_to_name.get(int(x), "Unknown Player"))
             factor_type = st.selectbox("📌 Type of factor", ["Fatigue", "Travel", "Motivation", "Mental", "Weather", "Other"])
             note_text = st.text_area("📝 Coach's Note")
             submitted = st.form_submit_button("Save Note")
@@ -1246,11 +1368,16 @@ elif st.session_state.active_tab == "External Factors":
 elif st.session_state.active_tab == "Match Analysis":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_match_analysis")
-    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
+    selected_name = st.selectbox(
+        "👤 Select a player",
+        options=["All"] + list(id_to_name.values()),
+        format_func=lambda x: x,
+        key="player_filter_analysis"
+    )
+
+    selected_player = name_to_id.get(selected_name, "All") if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
-    st.header("📍 Player Heatmap")
     with st.expander("➕ Add Match Event"):
         with st.form("add_match_event_form"):
             match_date = st.date_input("📅 Match Date", value=datetime.today())
@@ -1258,7 +1385,7 @@ elif st.session_state.active_tab == "Match Analysis":
             event_timestamp = datetime.combine(match_date, match_time)
 
             player_ids = sorted(gps_data["player_id"].dropna().unique())
-            event_player = st.selectbox("👤 Player Involved", options=player_ids)
+            event_player = st.selectbox("👤 Player Involved", options=player_ids, format_func=lambda x: PLAYER_NAMES.get(int(x), "Player not found"))
             event_type = st.selectbox("⚽ Event Type", options=["Pass", "Shot", "Dribble", "Tackle", "Interception", "Foul", "Save", "Clearance", "Cross", "Duel"])
 
             x_coord = st.slider("📍 X Position on Field (0 = Left, 105 = Right)", min_value=0.0, max_value=105.0, value=52.5)
@@ -1288,14 +1415,14 @@ elif st.session_state.active_tab == "Match Analysis":
                 st.success("✅ Match event successfully added.")
                 st.rerun()
     if selected_player != "All":
-        st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
+        st.caption(f"🔍 Showing data for **{PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("#### 📍 Heatmap of Match Involvement")
-        st.markdown(f"""
-        {'All players' if selected_player == "All" else f'Player {PLAYER_NAMES.get(int(selected_player), selected_player)}'}'s match involvement
+        st.caption(f"""
+        {'All players' if selected_player == "All" else f'{PLAYER_NAMES.get(int(selected_player), selected_player)}'}'s match involvement
         """)
 
         event_data = pd.read_csv("CFC Match Events Data.csv")
@@ -1389,7 +1516,7 @@ elif st.session_state.active_tab == "Match Analysis":
 
 
     st.subheader("🕒 Match Replay Timeline")
-    st.markdown("Animated replay of key events over time for a selected match and player.")
+    st.caption("Animated replay of key events over time for a selected match and player.")
 
     event_data = pd.read_csv("CFC Match Events Data.csv")
     event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
@@ -1424,7 +1551,7 @@ elif st.session_state.active_tab == "Match Analysis":
                     y="event_type",
                     color="event_type",
                     hover_data=["timestamp", "x", "y"],
-                    title=f"📊 Event Timeline – Player {selected_player}",
+                    title=f"📊 Event Timeline – {selected_player}",
                     labels={"timestamp": "Time", "event_type": "Event Type"}
                 )
                 fig_timeline.update_traces(marker=dict(size=12))
@@ -1477,6 +1604,13 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
     
     - 📈 Helps identify explosive workloads
     - 🧠 Useful for return-to-play or training adaptation
+    """)
+    st.caption("""
+    ### 📏 Interpreting Acceleration Values
+    - **> 2.0 m/s²**: Light acceleration (e.g. jogging bursts)
+    - **> 2.5 m/s²**: Moderate acceleration (standard game movements)
+    - **> 3.0 m/s²**: High acceleration (explosive efforts, pressing, sprints)
+    - **> 3.5 m/s²**: Very high intensity (sprint duels, fast counters)    
     """)
 
     accel_columns = list(sorted(set(
