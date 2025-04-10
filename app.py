@@ -63,7 +63,7 @@ if "active_tab" not in st.session_state:
 
 module_names = [
     "Match Analysis",
-    "Squad Overview",
+    "Physical fitness",
     "Load Demand",
     "Recovery",
     "Sprint & High Intensity",
@@ -128,7 +128,7 @@ def render_home():
 
     cards = [
         {"label": "Match Analysis", "icon": "📊", "tab": "Match Analysis"},
-        {"label": "Squad Overview", "icon": "🧠", "tab": "Squad Overview"},
+        {"label": "Physical fitness", "icon": "🧠", "tab": "Physical fitness"},
         {"label": "Load Demand", "icon": "📈", "tab": "Load Demand"},
         {"label": "Recovery", "icon": "🛌", "tab": "Recovery"},
         {"label": "Sprint & High Intensity", "icon": "⚡", "tab": "Sprint & High Intensity"},
@@ -191,6 +191,17 @@ def local_css(file_name):
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 local_css("styles.css")
+
+def get_season(date):
+    """Convert date to season format (e.g., '2024-25')"""
+    if isinstance(date, str):
+        try:
+            date = pd.to_datetime(date)
+        except:
+            return None
+    year = date.year
+    return f"{year}/{year+1}" if date.month >= 7 else f"{year-1}/{year}"
+
 
 def show_spinner():
     spinner_html = """
@@ -478,7 +489,7 @@ def generate_pdf_report(df, title="Team Report", score=None):
 
 if st.session_state.active_tab == "Home":
     render_home()
-elif st.session_state.active_tab == "Squad Overview":
+elif st.session_state.active_tab == "Physical fitness":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
     selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_squad")
@@ -510,6 +521,11 @@ elif st.session_state.active_tab == "Squad Overview":
  
     if not readiness_df.empty:
         st.markdown("This section gives you an overview of the team's physical availability..")
+
+        readiness_df["season"] = readiness_df["date"].apply(get_season)
+        seasons_available = sorted(readiness_df["season"].unique(), reverse=True)
+        selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_fitness")
+        readiness_df = readiness_df[readiness_df["season"] == selected_season]
  
         # Affichage des statistiques de readiness
         readiness_summary = readiness_df.groupby("date")["readiness_score"].mean().reset_index()
@@ -519,24 +535,40 @@ elif st.session_state.active_tab == "Squad Overview":
         fig.add_trace(go.Scatter(
             x=readiness_summary["date"],
             y=readiness_summary["readiness_score"],
-            mode="lines+markers",
-            name="Avg Readiness"
+            mode="markers",
+            name="Avg Readiness",
+            marker=dict(
+                size=10,
+                color='#034694',  # Chelsea blue
+                line=dict(
+                    color='white',
+                    width=1
+                )
+            ),
+            hovertemplate="Date: %{x}<br>Readiness: %{y:.1f}%<extra></extra>"
         ))
-        
-        fig.add_shape(type="rect", xref="x", yref="y", x0=readiness_summary["date"].min(), x1=readiness_summary["date"].max(),
-                      y0=0, y1=60, fillcolor="red", opacity=0.1, line_width=0)
-        fig.add_shape(type="rect", xref="x", yref="y", x0=readiness_summary["date"].min(), x1=readiness_summary["date"].max(),
-                      y0=60, y1=75, fillcolor="orange", opacity=0.1, line_width=0)
-        fig.add_shape(type="rect", xref="x", yref="y", x0=readiness_summary["date"].min(), x1=readiness_summary["date"].max(),
-                      y0=75, y1=100, fillcolor="green", opacity=0.1, line_width=0)
-        
+
+        fig.add_shape(type="rect", xref="x", yref="y", 
+                    x0=readiness_summary["date"].min(), 
+                    x1=readiness_summary["date"].max(),
+                    y0=0, y1=60, fillcolor="red", opacity=0.1, line_width=0)
+        fig.add_shape(type="rect", xref="x", yref="y", 
+                    x0=readiness_summary["date"].min(), 
+                    x1=readiness_summary["date"].max(),
+                    y0=60, y1=75, fillcolor="orange", opacity=0.1, line_width=0)
+        fig.add_shape(type="rect", xref="x", yref="y", 
+                    x0=readiness_summary["date"].min(), 
+                    x1=readiness_summary["date"].max(),
+                    y0=75, y1=100, fillcolor="green", opacity=0.1, line_width=0)
+
         fig.update_layout(
             title="📊 Team Readiness Over Time",
             yaxis_title="Readiness Score",
             xaxis_title="Date",
-            hovermode="x unified"
+            hovermode="x unified",
+            yaxis=dict(range=[0, 100])
         )
-        
+
         st.plotly_chart(fig, use_container_width=True)
 
         st.caption("""
@@ -627,15 +659,11 @@ elif st.session_state.active_tab == "Load Demand":
                 st.success("✅ Training load entry added successfully.")
                 st.rerun()
 
-    if not player_data.empty and "date" in player_data.columns:
-        min_date = player_data["date"].min()
-        max_date = player_data["date"].max()
-        selected_range = st.date_input("📅 Select date range", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    player_data["season"] = player_data["date"].apply(get_season)
+    seasons_available = sorted(player_data["season"].unique(), reverse=True)
+    selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_load")
+    player_data = player_data[player_data["season"] == selected_season]
 
-        if isinstance(selected_range, tuple) and len(selected_range) == 2:
-            start_date, end_date = selected_range
-            player_data = player_data[(player_data["date"] >= pd.to_datetime(start_date)) & (player_data["date"] <= pd.to_datetime(end_date))]
-    
     # Scatter plot Distance avec moyenne et tendance mensuelle
     if "distance" in player_data.columns:
         player_data = player_data[player_data["distance"] != 0]
@@ -688,26 +716,28 @@ elif st.session_state.active_tab == "Load Demand":
         - Orange line: Monthly trend showing load evolution
         - Green line: Overall average serving as a reference point
         """)
+
     # Acceleration/Deceleration per Session with Mean Line
+    st.subheader("⚡ Acceleration/Deceleration Analysis")
     accel_cols = [col for col in player_data.columns if "accel_decel" in col]
     if accel_cols:
-        for col in accel_cols:
-            fig_accel = px.line(
-                player_data.sort_values("date"),
-                    x="date",
-                    y=col,
-                    title=f"{col.replace('_', ' ').title()} per Session"
-                )
-            fig_accel.update_layout(height=800, width=1000)
-            mean_val = player_data[col].mean()
-            fig_accel.add_hline(y=mean_val, line_dash="dot", line_color="orange", annotation_text=f"Average: {mean_val:.1f}")
-            st.plotly_chart(fig_accel, use_container_width=True)
-            st.caption("""
-            Track explosive movements across sessions:
-            - Each peak represents high-intensity moments
-            - Orange average line helps identify if player maintains expected intensity
-            - Useful for monitoring explosive capacity and fatigue
-            """)
+        selected_accel_col = st.radio("⚡ Select acceleration metric", accel_cols, key="accel_selector_load")
+        fig_accel = px.line(
+            player_data.sort_values("date"),
+            x="date",
+            y=selected_accel_col,
+            title=f"{selected_accel_col.replace('_', ' ').title()} per Session (m/s²)"
+        )
+        fig_accel.update_layout(height=800, width=1000)
+        mean_val = player_data[selected_accel_col].mean()
+        fig_accel.add_hline(y=mean_val, line_dash="dot", line_color="orange", annotation_text=f"Average: {mean_val:.1f}")
+        st.plotly_chart(fig_accel, use_container_width=True)
+        st.caption("""
+        Track explosive movements across sessions:
+        - Each peak represents high-intensity moments
+        - Orange average line helps identify if player maintains expected intensity
+        - Useful for monitoring explosive capacity and fatigue
+        """)
     # Total Distance vs Peak Speed with Trendline
     if "peak_speed" in player_data.columns:
         fig_gps = px.scatter(
@@ -745,6 +775,7 @@ elif st.session_state.active_tab == "Recovery":
     if selected_player != "All":
         selected_player = int(selected_player)
         recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
+    
     st.header("🛌 Recovery Overview")
 
     st.markdown("🧪 **Recovery Score** – subjective score (0-100) of how recovered a player feels after effort.")
@@ -780,6 +811,11 @@ elif st.session_state.active_tab == "Recovery":
     if not recovery_data.empty:
         st.subheader("📈 Weekly Average Recovery Trend")
         st.markdown("Smooths out daily fluctuations to highlight overall team fatigue or freshness across weeks.")
+
+        recovery_data["season"] = recovery_data["date"].apply(get_season)
+        seasons_available = sorted(recovery_data["season"].unique(), reverse=True)
+        selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_recovery")
+        recovery_data = recovery_data[recovery_data["season"] == selected_season]
 
         recovery_data["week"] = pd.to_datetime(recovery_data["date"]).dt.to_period("W").dt.start_time
         weekly_avg = recovery_data.groupby("week")["recovery_score"].mean().reset_index()
@@ -868,51 +904,6 @@ elif st.session_state.active_tab == "Recovery":
         else:
             st.success("✅ No recovery data available for the last 3 days.")
 
-        st.subheader("📉 Simplified Recovery Trends")
-        st.markdown("Use this section to follow **player recovery evolution** in a more digestible format.")
- 
-        # Filtre temporel
-        min_date = recovery_data["date"].min()
-        max_date = recovery_data["date"].max()
-        selected_range = st.date_input("📅 Select period", value=(max_date - timedelta(days=14), max_date), min_value=min_date, max_value=max_date)
- 
-        if isinstance(selected_range, tuple) and len(selected_range) == 2:
-            start_date, end_date = selected_range
-            filtered_recovery = recovery_data[
-                (recovery_data["date"] >= pd.to_datetime(start_date)) &
-                (recovery_data["date"] <= pd.to_datetime(end_date))
-            ]
-        else:
-            filtered_recovery = recovery_data
- 
-        # Moyenne quotidienne par joueur
-        smoothed = (
-            filtered_recovery
-            .groupby(["date", "player_id"])["recovery_score"]
-            .mean()
-            .reset_index()
-        )
- 
-        # Sélection de joueurs à afficher
-        available_players = sorted(smoothed["player_id"].unique())
-        selected_players = st.multiselect("👤 Players to display", options=available_players, default=available_players, key="recovery_simplified_multiselect")
- 
-        smoothed = smoothed[smoothed["player_id"].isin(selected_players)]
- 
-        if not smoothed.empty:
-            fig_simple = px.line(
-                smoothed,
-                x="date",
-                y="recovery_score",
-                color="player_id",
-                markers=True,
-                title="📈 Recovery Score per Day",
-                labels={"recovery_score": "Recovery (%)", "date": "Date", "player_id": "Player"}
-            )
-            fig_simple.update_layout(height=600, width=1000)
-            st.plotly_chart(fig_simple, use_container_width=True)
-        else:
-            st.info("No recovery data available for the selected period or players.")
 
     st.subheader("⚖️ Recovery vs Training Load")
     st.markdown("""
@@ -983,6 +974,12 @@ elif st.session_state.active_tab == "Physical Development":
     if selected_player != "All":
         selected_player = int(selected_player)
         capability_data = capability_data[capability_data["player_id"] == selected_player]
+    if not capability_data.empty and "testdate" in capability_data.columns:
+        capability_data["testdate"] = pd.to_datetime(capability_data["testdate"], errors='coerce')
+        capability_data["season"] = capability_data["testdate"].apply(get_season)
+        seasons_available = sorted(capability_data["season"].unique(), reverse=True)
+        selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_physical")
+        capability_data = capability_data[capability_data["season"] == selected_season]
     st.header("🏋️ Physical Test Results")
     if selected_player != "All":
         st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
@@ -1305,10 +1302,27 @@ elif st.session_state.active_tab == "Match Analysis":
         event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
         filtered_events = event_data[event_data["player_id"] == selected_player] if selected_player != "All" else event_data
 
-        fig, ax = plt.subplots(figsize=(5, 3.2))
+        fig, ax = plt.subplots(figsize=(5, 3.2), facecolor="none")
         pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
         pitch.draw(ax=ax)
         pitch.kdeplot(filtered_events["x"], filtered_events["y"], ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
+        # Enhanced colorbar for better understanding
+        norm = plt.Normalize(vmin=0, vmax=1)
+        sm = plt.cm.ScalarMappable(cmap="Reds", norm=norm)
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax, orientation="horizontal", pad=0.05, fraction=0.05)
+        cbar.set_label("Player Activity Density", fontsize=6, color='white', labelpad=10)
+
+        # Add custom tick labels
+        tick_locs = [0.0, 0.5, 1.0]
+        cbar.set_ticks(tick_locs)
+        cbar.set_ticklabels(["Low", "Medium", "High"])
+
+        cbar.ax.tick_params(labelsize=10, colors='white')
+        cbar.outline.set_edgecolor('white')
+        for t in cbar.ax.get_xticklabels():
+            t.set_color('white')
+            t.set_fontsize(6)
         st.pyplot(fig, use_container_width=False)
 
         st.caption("""
@@ -1326,7 +1340,7 @@ elif st.session_state.active_tab == "Match Analysis":
         selected_types = st.multiselect("Select event types to display", options=available_types, default=default_types, label_visibility="collapsed")        
         filtered_events = filtered_events[filtered_events["event_type"].isin(selected_types)]
 
-        fig2, ax2 = plt.subplots(figsize=(5, 3.2))
+        fig2, ax2 = plt.subplots(figsize=(5, 3.2), facecolor="none")
         pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
         pitch.draw(ax=ax2)
 
@@ -1481,14 +1495,12 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
 
         selected_metric = st.selectbox("📊 Select intensity threshold", options=accel_columns, format_func=format_accel_label)
 
-        min_date = gps_data["date"].min()
-        max_date = gps_data["date"].max()
-        selected_range = st.date_input("📅 Select period", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-        if isinstance(selected_range, tuple) and len(selected_range) == 2:
-            start_date, end_date = selected_range
-            gps_data = gps_data[(gps_data["date"] >= pd.to_datetime(start_date)) & (gps_data["date"] <= pd.to_datetime(end_date))]
-
         display_mode = st.selectbox("🧮 Display as", ["Total", "Average per session"])
+
+        gps_data["season"] = gps_data["date"].apply(get_season)
+        seasons_available = sorted(gps_data["season"].unique(), reverse=True)
+        selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_sprint")
+        gps_data = gps_data[gps_data["season"] == selected_season]
 
         if display_mode == "Average per session":
             session_level = gps_data.groupby(["player_id", "date"])[selected_metric].sum().reset_index()
@@ -1498,7 +1510,6 @@ elif st.session_state.active_tab == "Sprint & High Intensity":
 
         summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
         summary = summary.sort_values(selected_metric, ascending=False)
-
 
         fig_summary = px.bar(
             summary,
