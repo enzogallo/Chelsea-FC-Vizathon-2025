@@ -50,7 +50,9 @@ def add_bg_from_local(image_file):
 
 add_bg_from_local('images/background.png')
 
-PLAYER_NAMES = {7: "Sterling", 10: "Mudryk", 22: "Chilwell"}
+PLAYER_NAMES = {7: "Raheem Sterling", 10: "Mykhaïlo Mudryk", 22: "Ben Chilwell"}
+name_to_id = {v: k for k, v in PLAYER_NAMES.items()}
+id_to_name = PLAYER_NAMES
 
 params = st.query_params
 if "tab" in params:
@@ -479,7 +481,8 @@ if st.session_state.active_tab == "Home":
 elif st.session_state.active_tab == "Squad Overview":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_squad")
+    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_squad")
+    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
         capability_data = capability_data[capability_data["player_id"] == selected_player]
@@ -589,7 +592,8 @@ elif st.session_state.active_tab == "Squad Overview":
 elif st.session_state.active_tab == "Load Demand":
     custom_header()
     player_list = gps_data["player_id"].dropna().unique()
-    selected_player = st.selectbox("Select Player for Individual View", options=["All"] + list(map(str, sorted(player_list))), key="player_filter_load")
+    selected_name = st.selectbox("Select Player for Individual View", options=["All"] + list(id_to_name.values()), key="player_filter_load")
+    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
         st.markdown(f"🔍 Showing data for **Player {PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
@@ -736,7 +740,8 @@ elif st.session_state.active_tab == "Load Demand":
 elif st.session_state.active_tab == "Recovery":
     custom_header()
     player_options = sorted(recovery_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_recovery")
+    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_recovery")
+    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
         recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
@@ -1078,7 +1083,8 @@ elif st.session_state.active_tab == "Physical Development":
 elif st.session_state.active_tab == "Biography":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_bio")
+    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_bio")
+    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
 
@@ -1139,7 +1145,8 @@ elif st.session_state.active_tab == "Biography":
 elif st.session_state.active_tab == "Injury":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_injury")
+    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_injury")
+    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
     st.header("❌ Injury & Medical Overview")
@@ -1210,7 +1217,8 @@ elif st.session_state.active_tab == "Injury":
 elif st.session_state.active_tab == "External Factors":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_external")
+    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_external")
+    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
     st.header("🌍 External Context")
@@ -1241,7 +1249,8 @@ elif st.session_state.active_tab == "External Factors":
 elif st.session_state.active_tab == "Match Analysis":
     custom_header()
     player_options = sorted(gps_data["player_id"].dropna().unique())
-    selected_player = st.selectbox("👤 Select a player", options=["All"] + list(map(str, player_options)), key="player_filter_match_analysis")
+    selected_name = st.selectbox("👤 Select a player", options=["All"] + list(id_to_name.values()), key="player_filter_match_analysis")
+    selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
     st.header("📍 Player Heatmap")
@@ -1346,22 +1355,24 @@ elif st.session_state.active_tab == "Match Analysis":
                 )
 
         from matplotlib.lines import Line2D
-        legend_elements = [
-            Line2D([0], [0], marker='o', color='w', label=etype,
-                markerfacecolor=color_palette[i % len(color_palette)],
-                markeredgecolor='black', markersize=10)
-            for i, etype in enumerate(selected_types)
-        ]
-        ax2.legend(handles=legend_elements, title="Event Type", loc="upper right", fontsize="small", title_fontsize="small")
-        st.pyplot(fig2, use_container_width=False)
+        legend_elements = []
+        for i, etype in enumerate(selected_types):
+            color = color_palette[i % len(color_palette)]
+            legend_elements.append(Line2D([0], [0], marker='o', color='w', label=f"{etype} (Success)",
+                markerfacecolor=color, markeredgecolor='black', markersize=8))
+            legend_elements.append(Line2D([0], [0], marker='X', color='w', label=f"{etype} (Fail)",
+                markerfacecolor='none', markeredgecolor=color, markersize=8))
+        
+        # Create a separate legend figure
+        fig_legend, ax_legend = plt.subplots(figsize=(6, 1), facecolor="none")
+        ax_legend.axis('off')
+        legend = ax_legend.legend(handles=legend_elements, title="Event Type", loc="center", ncol=3, fontsize="x-small", title_fontsize="x-small", frameon=False)
+        legend.get_title().set_color("white")
+        for text in legend.get_texts():
+            text.set_color("white")
+        st.pyplot(fig2, use_container_width=True)
+        st.pyplot(fig_legend, use_container_width=True)
 
-        st.caption("""
-        Event distribution analysis:
-        - Circles (●): Successful actions
-        - Crosses (✖): Unsuccessful attempts
-        - Colors differentiate event types
-        - Position on pitch shows tactical patterns
-        """)
 
     st.subheader("🕒 Match Replay Timeline")
     st.markdown("Animated replay of key events over time for a selected match and player.")
