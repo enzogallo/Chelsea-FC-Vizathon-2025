@@ -1220,7 +1220,7 @@ elif st.session_state.active_tab == "Biography":
     if selected_player != "All":
         selected_player = int(selected_player)
 
-    st.header("📇 Individual Development Plan (IDP)")
+    st.subheader("📇 Individual Development Plan (IDP)")
 
     # Charger données existantes
     dev_plan_path = "CFC Player Dev Plan.csv"
@@ -1229,7 +1229,7 @@ elif st.session_state.active_tab == "Biography":
     else:
         dev_data = pd.DataFrame(columns=["player_id", "long_term_goal", "dimensions", "status", "last_update", "coach_notes"])
 
-    st.markdown("🎯 This section tracks long-term and short-term player development objectives.")
+    st.caption("🎯 This section tracks long-term and short-term player development objectives.")
 
     player_id = selected_player
     st.subheader(f"🧑‍🎓 Development Plan for {PLAYER_NAMES.get(player_id, player_id)}")
@@ -1288,10 +1288,36 @@ elif st.session_state.active_tab == "Injury":
     if selected_player != "All":
         selected_player = int(selected_player)
     st.header("❌ Injury & Medical Overview")
+    with st.expander("➕ Add Injury Entry"):
+        with st.form("add_injury_entry_form"):
+            inj_date = st.date_input("📅 Injury Date", value=datetime.today(), key="inj_date")
+            inj_player = st.selectbox(
+                "👤 Player", 
+                options=sorted(gps_data["player_id"].dropna().unique()), 
+                format_func=lambda x: id_to_name.get(x, "Unknown Player"), 
+                key="inj_player"
+            )
+            inj_type = st.selectbox("🩹 Injury Type", ["Hamstring", "Knee", "Ankle", "Fatigue", "Other"])
+            inj_note = st.text_area("📝 Notes (optional)", key="inj_note")
+ 
+            submitted_injury = st.form_submit_button("➕ Add Injury Entry")
+            if submitted_injury:
+                new_injury = {
+                    "date": inj_date,
+                    "player_id": inj_player,
+                    "injury_status": inj_type
+                }
+ 
+                recovery_path = "CFC Recovery status Data.csv"
+                existing_recovery = pd.read_csv(recovery_path) if os.path.exists(recovery_path) else pd.DataFrame()
+                updated_recovery = pd.concat([existing_recovery, pd.DataFrame([new_injury])], ignore_index=True)
+                updated_recovery.to_csv(recovery_path, index=False)
+                st.success(f"✅ Injury entry added for {PLAYER_NAMES.get(inj_player)} on {inj_date} ({inj_type})")
+                st.rerun()
     if selected_player != "All":
         st.caption(f"🔍 Showing data for **{PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
         recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
-    st.markdown("Tracking injuries and analyzing availability trends.")
+    st.caption("Tracking injuries and analyzing availability trends.")
 
     if not recovery_data.empty:
         if "injury_status" in recovery_data.columns:
