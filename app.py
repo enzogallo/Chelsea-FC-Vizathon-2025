@@ -1422,9 +1422,16 @@ elif st.session_state.active_tab == "Match Analysis":
                 st.rerun()
             elif submitted_event and not opponent:
                 st.warning("⚠️ Please specify the opponent to record the match event.")
+
+    event_data = pd.read_csv("CFC Match Events Data.csv")
+    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"], format='mixed', errors='coerce')
+    event_data["match_id"] = event_data["opponent"]
+    match_ids = sorted(event_data["match_id"].dropna().unique())
+    selected_match = st.selectbox("Select Match", options=match_ids, key="match_filter_analysis")
+    match_filtered_events = event_data[event_data["match_id"] == selected_match]
+
     if selected_player != "All":
         st.caption(f"🔍 Showing data for **{PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
-
     col1, col2 = st.columns(2)
 
     with col1:
@@ -1432,10 +1439,8 @@ elif st.session_state.active_tab == "Match Analysis":
         st.caption(f"""
         {'All players' if selected_player == "All" else f'{PLAYER_NAMES.get(int(selected_player), selected_player)}'}'s match involvement
         """)
-
-        event_data = pd.read_csv("CFC Match Events Data.csv")
-        event_data["timestamp"] = pd.to_datetime(event_data["timestamp"], format='mixed', errors='coerce')
-        filtered_events = event_data[event_data["player_id"] == selected_player] if selected_player != "All" else event_data
+        
+        filtered_events = match_filtered_events[match_filtered_events["player_id"] == selected_player] if selected_player != "All" else match_filtered_events
 
         fig, ax = plt.subplots(figsize=(5, 3.2), facecolor="none")
         pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
@@ -1531,8 +1536,6 @@ elif st.session_state.active_tab == "Match Analysis":
     event_data["match_id"] = event_data["opponent"]
 
     if not event_data.empty:
-        match_ids = sorted(event_data["match_id"].dropna().unique())
-        selected_match = st.selectbox("Select Match", options=match_ids)
         match_events = event_data[event_data["match_id"] == selected_match]
 
         # Removed duplicate selectbox for player selection; using selected_player from Match Analysis
