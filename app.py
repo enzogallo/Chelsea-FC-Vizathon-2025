@@ -594,6 +594,33 @@ elif st.session_state.active_tab == "Physical fitness":
         high_pct = (high / total_days) * 100 if total_days > 0 else 0
 
         st.markdown("#### 🔍 Summary of readiness levels")
+        if selected_player == "All":
+            st.markdown("#### 🏅 Player Fitness Leaderboard")
+            st.caption("This ranking shows which players maintain the highest average readiness levels over the selected season.")
+            
+            leaderboard_df = readiness_df.groupby("player_id")["readiness_score"].mean().reset_index()
+            leaderboard_df["Player Name"] = leaderboard_df["player_id"].map(PLAYER_NAMES)
+            leaderboard_df = leaderboard_df.sort_values("readiness_score", ascending=False)
+
+
+            fig_leaderboard = px.bar(
+                leaderboard_df,
+                x="readiness_score",
+                y="Player Name",
+                orientation="h",
+                color="readiness_score",
+                color_continuous_scale="greens",
+                labels={"readiness_score": "Avg Readiness (%)"},
+                title="🏅 Average Player Readiness – Season Ranking"
+            )
+            fig_leaderboard.update_layout(
+                xaxis=dict(range=[0, 100]),
+                height=400,
+                margin=dict(t=60, l=100),
+                yaxis_title=None
+            )
+            st.plotly_chart(fig_leaderboard, use_container_width=True)
+
         critical_days = readiness_summary[readiness_summary["readiness_score"] < 60]
         if not critical_days.empty:
             st.error(f"⚠️ {len(critical_days)} critical readiness days detected. Last one: {critical_days['date'].max().strftime('%Y-%m-%d')}")
