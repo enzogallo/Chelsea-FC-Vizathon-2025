@@ -1619,7 +1619,7 @@ elif st.session_state.active_tab == "Match Analysis":
                     y="event_type",
                     color="event_type",
                     hover_data=["timestamp", "x", "y"],
-                    title=f"📊 Event Timeline – {selected_player}",
+                    title=f"📊 Event Timeline – {PLAYER_NAMES.get(int(selected_player), selected_player)}",
                     labels={"timestamp": "Time", "event_type": "Event Type"}
                 )
                 fig_timeline.update_traces(marker=dict(size=12))
