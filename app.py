@@ -528,7 +528,7 @@ elif st.session_state.active_tab == "Physical fitness":
     if not readiness_df.empty:
 
         readiness_df["season"] = readiness_df["date"].apply(get_season)
-        seasons_available = sorted(readiness_df["season"].unique(), reverse=True)
+        seasons_available = sorted([s for s in readiness_df["season"].unique() if isinstance(s, str)], reverse=True)
         selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_fitness")
         readiness_df = readiness_df[readiness_df["season"] == selected_season]
  
@@ -1035,8 +1035,9 @@ elif st.session_state.active_tab == "Physical Development":
         capability_data = capability_data[capability_data["player_id"] == selected_player]
     if not capability_data.empty and "testdate" in capability_data.columns:
         capability_data["testdate"] = pd.to_datetime(capability_data["testdate"], errors='coerce')
-        capability_data["season"] = capability_data["testdate"].apply(get_season)
-        seasons_available = sorted(capability_data["season"].unique(), reverse=True)
+        valid_dates = capability_data["testdate"].notna()
+        capability_data.loc[valid_dates, "season"] = capability_data.loc[valid_dates, "testdate"].apply(get_season)
+        seasons_available = sorted([s for s in capability_data["season"].unique() if isinstance(s, str)], reverse=True)
         selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_physical")
         capability_data = capability_data[capability_data["season"] == selected_season]
     st.header("🏋️ Physical Test Results")
@@ -1075,15 +1076,46 @@ elif st.session_state.active_tab == "Physical Development":
             st.subheader("🌡️ Player vs Movement Heatmap")
             st.caption("Visual comparison of each player's performance per movement — helps identify strengths and weaknesses at a glance.")
             
-            if 'player_id' in capability_data.columns and 'movement' in capability_data.columns and 'benchmarkpct' in capability_data.columns:
-                heatmap_data = capability_data.pivot_table(index='player_id', columns='movement', values='benchmarkpct')
-                heatmap_data.index = heatmap_data.index.map(PLAYER_NAMES.get)
-                fig_heatmap, ax = plt.subplots(figsize=(8, 4))
-                ax.set_facecolor('none')
-                sns.heatmap(heatmap_data, cmap="RdYlGn", annot=True, fmt=".0f", ax=ax, linewidths=.5, cbar_kws={"label": "% Benchmark"})
-                st.pyplot(fig_heatmap)
-            else:
-                st.warning("❌ Required columns not found in capability_data.")
+        if 'player_id' in capability_data.columns and 'movement' in capability_data.columns and 'benchmarkpct' in capability_data.columns:
+            heatmap_data = capability_data.pivot_table(index='player_id', columns='movement', values='benchmarkpct')
+            heatmap_data.index = heatmap_data.index.map(PLAYER_NAMES.get)
+            fig_heatmap, ax = plt.subplots(figsize=(8, 4), facecolor='none')
+            ax.set_facecolor('none')
+            sns.heatmap(
+                heatmap_data,
+                cmap="RdYlGn",
+                annot=True,
+                fmt=".0f",
+                ax=ax,
+                linewidths=.5,
+                cbar_kws={"label": "% Benchmark"}
+            )
+            for text in ax.texts:
+                text.set_color("white")
+            ax.tick_params(axis='both', colors='white')
+            ax.xaxis.label.set_color('white')
+            ax.yaxis.label.set_color('white')
+            for label in ax.get_xticklabels():
+                label.set_color('white')
+            for label in ax.get_yticklabels():
+                label.set_color('white')
+            cbar = ax.collections[0].colorbar
+            cbar.ax.yaxis.label.set_color('white')  # Colorbar label
+            cbar.ax.tick_params(colors='white')    # Tick marks
+            for t in cbar.ax.get_yticklabels():    # Tick labels
+                t.set_color('white')
+                t.set_fontsize(10)
+            ax.set_xlabel("")
+            ax.set_ylabel("")
+            st.pyplot(fig_heatmap)
+            st.caption("""
+            This heatmap highlights the performance of each player across various physical movement categories — agility, sprint, jump, and upper body.
+            - Dark green: Performance closer to the benchmark
+            - Red: Lower relative performance
+            - Use this chart to spot physical strengths or areas needing attention
+            """)
+        else:
+            st.warning("❌ Required columns not found in capability_data.")
 
         st.markdown("##### 📊 Performance Distribution by Movement Type")
         if {'movement', 'benchmarkpct'}.issubset(capability_data.columns):
@@ -1318,7 +1350,7 @@ elif st.session_state.active_tab == "Injury":
                     ),
                     showlegend=True,
                     legend=dict(
-                        font=dict(size=18),
+                        font=dict(color="white", size=18),
                         title_font=dict(size=18)
                     )
                 )
