@@ -629,7 +629,11 @@ elif st.session_state.active_tab == "Physical fitness":
 elif st.session_state.active_tab == "Load Demand":
     custom_header()
     player_list = gps_data["player_id"].dropna().unique()
-    selected_name = st.selectbox("Select Player for Individual View", options=["All"] + list(id_to_name.values()), format_func=lambda x: PLAYER_NAMES.get(int(x), "Unknown Player") if x != "All" else "All", key="player_filter_load")
+    selected_name = st.selectbox(
+        "Select Player for Individual View",
+        options=["All"] + list(id_to_name.values()),
+        key="player_filter_load"
+    )    
     selected_player = name_to_id[selected_name] if selected_name != "All" else "All"
     if selected_player != "All":
         selected_player = int(selected_player)
@@ -1387,6 +1391,7 @@ elif st.session_state.active_tab == "Match Analysis":
             player_ids = sorted(gps_data["player_id"].dropna().unique())
             event_player = st.selectbox("👤 Player Involved", options=player_ids, format_func=lambda x: PLAYER_NAMES.get(int(x), "Player not found"))
             event_type = st.selectbox("⚽ Event Type", options=["Pass", "Shot", "Dribble", "Tackle", "Interception", "Foul", "Save", "Clearance", "Cross", "Duel"])
+            opponent = st.text_input("🏟️ Opponent (e.g. Arsenal)", key="match_opponent")
 
             x_coord = st.slider("📍 X Position on Field (0 = Left, 105 = Right)", min_value=0.0, max_value=105.0, value=52.5)
             y_coord = st.slider("📍 Y Position on Field (0 = Bottom, 68 = Top)", min_value=0.0, max_value=68.0, value=34.0)
@@ -1396,24 +1401,27 @@ elif st.session_state.active_tab == "Match Analysis":
 
             submitted_event = st.form_submit_button("Add Event to Match Dataset")
 
-            if submitted_event:
+            if submitted_event and opponent:
                 event_entry = {
                     "timestamp": event_timestamp,
                     "player_id": event_player,
                     "event_type": event_type,
+                    "opponent": opponent,
                     "x": round(x_coord, 2),
                     "y": round(y_coord, 2),
                     "tags": tags,
                     "notes": notes
                 }
-
+ 
                 events_path = "CFC Match Events Data.csv"
                 existing_events = pd.read_csv(events_path) if os.path.exists(events_path) else pd.DataFrame()
                 updated_events = pd.concat([existing_events, pd.DataFrame([event_entry])], ignore_index=True)
                 updated_events.to_csv(events_path, index=False)
-
+ 
                 st.success("✅ Match event successfully added.")
                 st.rerun()
+            elif submitted_event and not opponent:
+                st.warning("⚠️ Please specify the opponent to record the match event.")
     if selected_player != "All":
         st.caption(f"🔍 Showing data for **{PLAYER_NAMES.get(selected_player, str(selected_player))}** only.")
 
@@ -1426,7 +1434,7 @@ elif st.session_state.active_tab == "Match Analysis":
         """)
 
         event_data = pd.read_csv("CFC Match Events Data.csv")
-        event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
+        event_data["timestamp"] = pd.to_datetime(event_data["timestamp"], format='mixed', errors='coerce')
         filtered_events = event_data[event_data["player_id"] == selected_player] if selected_player != "All" else event_data
 
         fig, ax = plt.subplots(figsize=(5, 3.2), facecolor="none")
@@ -1519,14 +1527,13 @@ elif st.session_state.active_tab == "Match Analysis":
     st.caption("Animated replay of key events over time for a selected match and player.")
 
     event_data = pd.read_csv("CFC Match Events Data.csv")
-    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"])
+    event_data["timestamp"] = pd.to_datetime(event_data["timestamp"], format='mixed', errors='coerce')
+    event_data["match_id"] = event_data["opponent"]
 
     if not event_data.empty:
-        event_data["match_date"] = event_data["timestamp"].dt.date
-        match_dates = sorted(event_data["match_date"].unique())
-        selected_match = st.selectbox("Select Match Date", options=match_dates)
-
-        match_events = event_data[event_data["match_date"] == selected_match]
+        match_ids = sorted(event_data["match_id"].dropna().unique())
+        selected_match = st.selectbox("Select Match", options=match_ids)
+        match_events = event_data[event_data["match_id"] == selected_match]
 
         # Removed duplicate selectbox for player selection; using selected_player from Match Analysis
 
@@ -1576,7 +1583,7 @@ elif st.session_state.active_tab == "Match Analysis":
                 )
                 st.plotly_chart(fig_timeline, use_container_width=True)
         else:
-            st.warning("No events found for this player in the selected match.")
+            st.caption("Select a player to see detailed stats timeline.")
     else:
         st.info("No match data available for replay.")
 
