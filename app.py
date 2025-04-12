@@ -78,7 +78,7 @@ def custom_header():
         add_logo("https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg", height=80)
         with stylable_container("header-button", css_styles="""
             button {
-                background-color: #034694;
+                background-color: #012d5e;
                 color: white;
                 font-weight: bold;
                 padding: 0.75rem 2.5rem;
@@ -89,14 +89,14 @@ def custom_header():
                 transition: all 0.3s ease;
             }
             button:hover {
-                background-color: #012d5e;
+                background-color: #034694;
                 box-shadow: 0px 6px 14px rgba(0, 0, 0, 0.4);
             }
         """):
             if st.button("⚽ CFC Data Center", key="home_nav_button"):
                 st.session_state.active_tab = "Home"
                 st.rerun()
-        st.caption("© Enzo Gallo, 2025")
+        st.caption("© Enzo Gallo 2025")
 
     selected_tab = option_menu(
         menu_title=None,
@@ -718,7 +718,7 @@ elif st.session_state.active_tab == "Load Demand":
             y=player_data_sorted["distance"],
             mode="markers",
             name="Distance per session",
-            marker=dict(size=6, color="blue"),
+            marker=dict(size=6, color="skyblue"),
             hovertemplate="Date: %{x}<br>Distance: %{y} m"
         ))
 
@@ -739,10 +739,23 @@ elif st.session_state.active_tab == "Load Demand":
         )
 
         fig_distance.update_layout(
+            hoverlabel=dict(
+                bgcolor="#012d5e",
+                font_color="#012d5e",
+                font_size=13
+            )
+        )
+
+        fig_distance.update_layout(
         title="📊 Distance per Session with Monthly Trend",
             xaxis_title="Date",
             yaxis_title="Distance (m)",
-            height=600
+            height=600,
+            hoverlabel=dict(
+                bgcolor="#012d5e",
+                font_color="white",
+                font_size=13
+            )
         )
 
         st.plotly_chart(fig_distance, use_container_width=True)
@@ -1014,36 +1027,35 @@ elif st.session_state.active_tab == "Recovery":
     player_ids = sorted(merged["player_id"].unique())
     player_display_names = [id_to_name.get(pid, str(pid)) for pid in player_ids]
     player_name_to_id = {id_to_name.get(pid, str(pid)): pid for pid in player_ids}
-    selected_names = st.multiselect("👤 Select players for trend view", options=player_display_names, default=player_display_names, key="recovery_trend_multiselect")
+    selected_names = st.multiselect(
+        "👤 Select players for trend view",
+        options=player_display_names,
+        default=player_display_names[:1],
+        key="recovery_trend_multiselect"
+    )
     trend_selected_players = [player_name_to_id[name] for name in selected_names]
 
     merged = merged[merged["player_id"].isin(trend_selected_players)]
     
     if not merged.empty:
-        # Un graphe par joueur
+        merged["player_name"] = merged["player_id"].map(PLAYER_NAMES)
+        fig = px.scatter(
+            merged,
+            x="distance",
+            y="recovery_score",
+            color="player_name",
+            trendline="ols",
+            opacity=0.3,
+            title="Distance vs Recovery – Trend by Player",
+            labels={"distance": "Distance (m)", "recovery_score": "Recovery (%)", "player_name": "Player"}
+        )
+        fig.update_traces(selector=dict(mode='lines'), line=dict(width=4))
+        fig.update_layout(height=500)
+        st.plotly_chart(fig, use_container_width=True)
+
         for pid in trend_selected_players:
             player_subset = merged[merged["player_id"] == pid]
-            if player_subset.empty:
-                continue
-    
-            fig = px.scatter(
-                player_subset,
-                x="distance",
-                y="recovery_score",
-                trendline="ols",
-                title=f"{PLAYER_NAMES.get(pid, str(pid))} – Distance vs Recovery",  # Modifié ici
-                labels={"distance": "Distance (m)", "recovery_score": "Recovery (%)"},
-                opacity=0.3
-            )
-            fig.update_traces(selector=dict(mode='lines'), line=dict(width=4))
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
-            st.markdown("**Focus on the line** – it shows the relationship between distance and recovery. Dots are daily sessions.")
-    
-            # Pente de la tendance
-            model = np.polyfit(player_subset["distance"], player_subset["recovery_score"], 1)
-            slope = model[0]
-    
+            slope = np.polyfit(player_subset["distance"], player_subset["recovery_score"], 1)[0]
             if slope < -0.005:
                 st.error(f"⚠️ {PLAYER_NAMES.get(pid, str(pid))} : Recovery drops significantly with increased load.")
             elif slope > 0.005:
