@@ -1378,6 +1378,27 @@ elif st.session_state.active_tab == "Biography":
         fig_pie.update_traces(textinfo="percent+label")
         fig_pie.update_layout(height=600)
         st.plotly_chart(fig_pie, use_container_width=True)
+        st.markdown("### 📋 Development Objective History")
+        st.caption("Below is a history of all development objectives recorded for this player.")
+        table_data = existing[["last_update", "long_term_goal", "dimensions", "status", "coach_notes"]].sort_values("last_update", ascending=False)
+        table_data = table_data.rename(columns={
+            "last_update": "🕒 Last Update",
+            "long_term_goal": "🎯 Long-Term Vision",
+            "dimensions": "📌 Focus Areas",
+            "status": "📈 Status",
+            "coach_notes": "📝 Coach Notes"
+        })
+        for _, row in table_data.iterrows():
+            with st.container():
+                st.markdown(f"""
+                    <div style="border: 1px solid #ccc; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background-color: #012d5e;">
+                        <h4 style="margin-bottom: 0.5rem;">🎯 {row['🎯 Long-Term Vision']}</h4>
+                        <p><strong>📌 Focus Areas:</strong> {row['📌 Focus Areas']}</p>
+                        <p><strong>📈 Status:</strong> {row['📈 Status']}</p>
+                        <p><strong>📝 Coach Notes:</strong> {row['📝 Coach Notes']}</p>
+                        <p style="font-size: 0.8rem; color: gray;"><em>🕒 Last Update: {row['🕒 Last Update']}</em></p>
+                    </div>
+                """, unsafe_allow_html=True)
     else:
         st.info("No development plan recorded yet for this player.")
     
