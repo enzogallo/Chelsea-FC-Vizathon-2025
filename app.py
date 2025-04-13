@@ -395,67 +395,134 @@ if not gps_data.empty and not recovery_data.empty:
 
     readiness_df["readiness_score"] = readiness_df.apply(calculate_readiness, axis=1)
 
-    def generate_player_report(player_id, filtered_events, color_palette):
-        fig, ax = plt.subplots(figsize=(6, 4))
+    def generate_player_report(player_id, filtered_events, color_palette, filtered_event_types=None, fig_timeline=None):
+        def sanitize(text):
+            import unicodedata
+            return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+
+        fig, ax = plt.subplots(figsize=(10, 7.2))
+        filtered_events["timestamp"] = pd.to_datetime(filtered_events["timestamp"], errors="coerce")
+        if filtered_event_types:
+            timeline_filtered_events = filtered_events[filtered_events["event_type"].isin(filtered_event_types)]
+        else:
+            timeline_filtered_events = filtered_events.copy()
+        # Analyse des événements pour résumé using timeline_filtered_events
+        stats_summary = timeline_filtered_events["event_type"].value_counts().to_dict()
+        total_events = len(timeline_filtered_events)
+        most_active_zone = "Left side" if timeline_filtered_events["x"].mean() < 52.5 else "Right side"
+        top_activity_minute = timeline_filtered_events["timestamp"].dt.minute.mode().iloc[0] if not timeline_filtered_events.empty else None
         pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
         pitch.draw(ax=ax)
         x_vals = np.random.normal(52.5, 20, 100)
         y_vals = np.random.normal(34, 15, 100)
         pitch.kdeplot(x_vals, y_vals, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
+        # Supprimer l'ancien bloc colorbar s'il existe
+        
+        # Nouveau bloc colorbar positionné en-dessous
+        fig.subplots_adjust(top=0.85, bottom=0.12)
+        norm = plt.Normalize(vmin=0, vmax=1)
+        sm = plt.cm.ScalarMappable(cmap="Reds", norm=norm)
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax, orientation="horizontal", pad=0.15, fraction=0.05)
+        cbar.set_label("Player Activity Density", fontsize=10)
+        tick_locs = [0.0, 0.5, 1.0]
+        cbar.set_ticks(tick_locs)
+        cbar.set_ticklabels(["Low", "Medium", "High"])
+        cbar.ax.tick_params(labelsize=9)
         tmp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir="/tmp")
         fig.savefig(tmp_img.name)
         plt.close(fig)
 
-        fig2, ax2 = plt.subplots(figsize=(6, 4))
+        fig2, ax2 = plt.subplots(figsize=(8, 6))
         pitch = Pitch(pitch_type='statsbomb', pitch_color='green', line_color='white')
         pitch.draw(ax=ax2)
+        fig2.subplots_adjust(bottom=0.25)
 
         for i, etype in enumerate(filtered_events["event_type"].unique()):
             sub = filtered_events[filtered_events["event_type"] == etype]
             color = color_palette[i % len(color_palette)]
-            ax2.scatter(sub["x"], sub["y"], label=etype, c=color, alpha=0.6, edgecolors="black")
+            sub_success = sub[sub["success"] == True]
+            sub_fail = sub[sub["success"] == False]
+            if not sub_success.empty:
+                ax2.scatter(sub_success["x"], sub_success["y"], label=f"{etype} (Success)", c=color, alpha=0.6, edgecolors="black", marker='o')
+            if not sub_fail.empty:
+                ax2.scatter(sub_fail["x"], sub_fail["y"], label=f"{etype} (Fail)", facecolors='none', edgecolors=color, alpha=0.6, marker='o')
 
-        ax2.legend()
+        legend = ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=3)
         tmp_img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir="/tmp")
         fig2.savefig(tmp_img2.name)
         plt.close(fig2)
 
         pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(200, 10, f"Player {player_id} Heatmap Report", ln=True, align="C")
+        pdf.set_font("Arial", 'B', 16)
+        pdf.set_text_color(3, 70, 148)  # Chelsea Blue
+        pdf.cell(200, 10, sanitize(f"Chelsea FC – Player {player_id} Match Report"), ln=True, align="C")
+        pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", '', 12)
-        pdf.cell(200, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True, align="C")
-        pdf.image(tmp_img.name, x=30, y=40, w=150)  # lower the Y position to avoid clipping
-        pdf.ln(120)  # add more space before the second image
+        pdf.cell(200, 10, sanitize(f"Date: {datetime.now().strftime('%Y-%m-%d')}"), ln=True, align="C")
+        pdf.ln(10)
+
+        summary_text = f"""
+            MATCH SUMMARY:
+            • Total Events: {total_events}
+            • Most Active Zone: {most_active_zone}
+            • Peak Activity Minute: {top_activity_minute}th minute
+
+            EVENT BREAKDOWN:
+            """ + "\n".join([f"• {evt_type}: {count}" for evt_type, count in stats_summary.items()]) + f"""
+
+            COACH SUMMARY:
+            Player had {total_events} key match events with high concentration on the {most_active_zone.lower()}.
+            Peak involvement around minute {top_activity_minute}.
+            Recommendation: emphasize transition actions in this zone and review decision-making around peak moments.
+            """
+        
+        import unicodedata
+        summary_text = unicodedata.normalize("NFKD", summary_text).encode("ascii", "ignore").decode("ascii")
+        pdf.multi_cell(0, 10, txt=sanitize(summary_text.strip()))
+
+        pdf.add_page()
         pdf.set_font("Arial", 'B', 12)
+        pdf.set_text_color(3, 70, 148)  # Chelsea Blue
+        pdf.cell(200, 10, "Heatmap of Player Involvement", ln=True, align="C")
+        pdf.set_text_color(0, 0, 0)
+        pdf.image(tmp_img.name, x=30, y=20, w=150)
+        pdf.ln(100)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.set_text_color(3, 70, 148)  # Chelsea Blue
         pdf.cell(200, 10, "Event Map by Type", ln=True, align="C")
-        pdf.image(tmp_img2.name, x=30, y=140, w=150)  # shift the second image as well
+        pdf.set_text_color(0, 0, 0)
+        pdf.image(tmp_img2.name, x=30, y=130, w=150)
         
-        
-        
-        timeline_fig = px.scatter(
-            filtered_events,
-            x="timestamp",
-            y="event_type",
-            color="event_type",
-            hover_data=["timestamp", "x", "y"],
-            title=f"Event Timeline – Player {player_id}",
-            labels={"timestamp": "Time", "event_type": "Event Type"}
-        )
-        timeline_fig.update_layout(height=400)
         
         tmp_img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir="/tmp")
-        img_bytes = to_image(timeline_fig, format="png", width=800, height=400)
+        img_bytes = to_image(fig_timeline, format="png", width=800, height=400)
         with open(tmp_img3.name, "wb") as f:
             f.write(img_bytes)
         
         pdf.ln(100)
+        pdf.add_page()
         pdf.set_font("Arial", 'B', 12)
+        pdf.set_text_color(3, 70, 148)  # Chelsea Blue
         pdf.cell(200, 10, "Timeline of Match Events", ln=True, align="C")
-        pdf.image(tmp_img3.name, x=30, y=230, w=150)
+        pdf.set_text_color(0, 0, 0)
+        pdf.image(tmp_img3.name, x=30, y=30, w=150)
+
+        import re
         
-        return pdf.output(dest="S").encode("latin1")
+        def clean_text_for_pdf(text):
+            # Remove or replace problematic characters
+            text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+            text = re.sub(r"[^\x00-\x7F]+", "", text)  # Strip non-ASCII just in case
+            return text
+        
+        
+        raw_pdf = pdf.output(dest="S")
+        if isinstance(raw_pdf, str):
+            raw_pdf = raw_pdf.encode("latin1", errors="replace")
+        return raw_pdf
 else:
     readiness_df = pd.DataFrame()
 
@@ -500,13 +567,9 @@ elif st.session_state.active_tab == "Physical fitness":
     )
 
     selected_player = name_to_id.get(selected_name, "All") if selected_name != "All" else "All"
-    if selected_player != "All":
-        selected_player = int(selected_player)
-        capability_data = capability_data[capability_data["player_id"] == selected_player]
-        recovery_data = recovery_data[recovery_data["player_id"] == selected_player]
-        gps_data_filtered = gps_data[gps_data["player_id"] == selected_player]
-        recovery_data_filtered = recovery_data[recovery_data["player_id"] == selected_player]
-    else:
+    if True:
+        if selected_player != "All":
+            selected_player = int(selected_player)
         gps_data_filtered = gps_data
         recovery_data_filtered = recovery_data
     gps_latest = gps_data_filtered.sort_values("date").groupby(["player_id", "date"]).tail(1)
@@ -1637,13 +1700,16 @@ elif st.session_state.active_tab == "Match Analysis":
 
         # Removed duplicate selectbox for player selection; using selected_player from Match Analysis
 
-        player_events = match_events[match_events["player_id"] == selected_player]
+        player_events = match_events if selected_player == "All" else match_events[match_events["player_id"] == selected_player]
+        player_label = "All Players" if selected_player == "All" else PLAYER_NAMES.get(int(selected_player), selected_player)
+        timeline_filtered_events = match_filtered_events[
+            match_filtered_events["event_type"].isin(selected_types)
+        ]
 
         if not player_events.empty:
             player_events = player_events.sort_values("timestamp")
             player_events["time"] = player_events["timestamp"].dt.strftime("%H:%M:%S")
 
-            import plotly.express as px
             available_event_types = sorted(player_events["event_type"].unique())
             selected_event_types = st.multiselect("Filter by Event Type", available_event_types, default=available_event_types)
             if not selected_event_types:
@@ -1657,122 +1723,36 @@ elif st.session_state.active_tab == "Match Analysis":
                     x="timestamp",
                     y="event_type",
                     color="event_type",
+                    color_discrete_sequence=color_palette,
                     hover_data=["timestamp", "x", "y"],
-                    title=f"📊 Event Timeline – {PLAYER_NAMES.get(int(selected_player), selected_player)}",
+                    title=f"📊 Event Timeline – {player_label}",
                     labels={"timestamp": "Time", "event_type": "Event Type"}
                 )
                 fig_timeline.update_traces(marker=dict(size=12))
                 fig_timeline.update_layout(
                     height=700,
                     width=1000,
-                    xaxis=dict(
-                        title="Timestamp",
-                        title_font=dict(size=16),
-                        tickfont=dict(size=14)
-                    ),
-                    yaxis=dict(
-                        title="Event Type",
-                        title_font=dict(size=16),
-                        tickfont=dict(size=16)
-                    ),
+                    xaxis=dict(title="Timestamp", title_font=dict(size=16), tickfont=dict(size=14)),
+                    yaxis=dict(title="Event Type", title_font=dict(size=16), tickfont=dict(size=16)),
                     showlegend=True,
-                    legend=dict(
-                        font=dict(size=18),
-                        title_font=dict(size=18)
-                    )
+                    legend=dict(font=dict(size=18), title_font=dict(size=18))
                 )
                 st.plotly_chart(fig_timeline, use_container_width=True)
-        else:
-            st.caption("Select a player to see detailed stats timeline.")
-    else:
-        st.info("No match data available for replay.")
 
-    if "show_download_button" not in st.session_state:
-        st.session_state.show_download_button = False
-
-    report_bytes = generate_player_report(selected_player, filtered_events, color_palette)
-    download_col1, download_col2, download_col3 = st.columns([4, 1, 1])
-    with download_col3:
-        st.download_button(
-            label="📄 Download Player Report",
-            data=report_bytes,
-            file_name=f"player_{selected_player}_report.pdf",
-            mime="application/pdf",
-            key="download_player_report"
-        )
-
-    
-elif st.session_state.active_tab == "Sprint & High Intensity":
-    custom_header()
-    st.header("⚡ Sprint & High Intensity Zones")
-
-    st.markdown("""
-    This module summarizes high-intensity efforts per player based on accelerations and decelerations detected by GPS.
-    
-    - 📈 Helps identify explosive workloads
-    - 🧠 Useful for return-to-play or training adaptation
-    """)
-    st.caption("""
-    ### 📏 Interpreting Acceleration Values
-    - **> 2.0 m/s²**: Light acceleration (e.g. jogging bursts)
-    - **> 2.5 m/s²**: Moderate acceleration (standard game movements)
-    - **> 3.0 m/s²**: High acceleration (explosive efforts, pressing, sprints)
-    - **> 3.5 m/s²**: Very high intensity (sprint duels, fast counters)    
-    """)
-
-    accel_columns = list(sorted(set(
-        col for col in gps_data.columns if "accel_decel_over_" in col
-    )))
-
-    if not accel_columns:
-        st.warning("No acceleration data found in the GPS file.")
-    else:
-        def format_accel_label(col_name):
-            match = re.search(r"over_(\d+)_(\d+)", col_name)
-            if match:
-                return f"> {match.group(1)}.{match.group(2)} m/s²"
-            else:
-                return col_name
-
-        selected_metric = st.selectbox("📊 Select intensity threshold", options=accel_columns, format_func=format_accel_label)
-
-        display_mode = st.selectbox("🧮 Display as", ["Total", "Average per session"])
-
-        gps_data["season"] = gps_data["date"].apply(get_season)
-        seasons_available = sorted(gps_data["season"].unique(), reverse=True)
-        selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_sprint")
-        gps_data = gps_data[gps_data["season"] == selected_season]
-
-        if display_mode == "Average per session":
-            session_level = gps_data.groupby(["player_id", "date"])[selected_metric].sum().reset_index()
-            summary = session_level.groupby("player_id")[selected_metric].mean().reset_index()
-        else:
-            summary = gps_data.groupby("player_id")[selected_metric].sum().reset_index()
-
-        summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
-        summary = summary.sort_values(selected_metric, ascending=False)
-
-        fig_summary = px.bar(
-            summary,
-            x="Player",
-            y=selected_metric,
-            title=f"{'Average per Session' if display_mode == 'Average per session' else 'Total'} Accelerations/Decelerations Above Threshold",
-            labels={selected_metric: "Effort Count"},
-            text_auto=True
-        )
-        fig_summary.update_layout(height=500)
-        st.plotly_chart(fig_summary, use_container_width=True)
-
-        st.caption("""
-        High-intensity effort comparison:
-        - Higher bars indicate more explosive actions
-        - Compare players' workload at same intensity threshold
-        - Helps identify players who might need specific conditioning
-        """)
-
-        st.markdown("### 📘 Coach Insights")
-        st.markdown("""
-        - Players with higher effort counts were more involved in explosive actions.
-        - Use this metric to track conditioning or compare match/training impact.
-        - ⚠️ Very low counts might indicate reduced involvement or performance drop.
-        """)
+                # PDF button (optional, keep it here if needed)
+                report_bytes = generate_player_report(
+                    selected_player,
+                    filtered_events,  # pour la heatmap et l'event map
+                    color_palette,
+                    filtered_event_types=selected_types,  # types sélectionnés pour l'event map
+                    fig_timeline=fig_timeline  # timeline = événements + types filtrés dans la timeline
+                )
+                download_col1, download_col2, download_col3 = st.columns([4, 1, 1])
+                with download_col3:
+                    st.download_button(
+                        label="📄 Download Player Report",
+                        data=report_bytes,
+                        file_name=f"player_{selected_player}_report.pdf",
+                        mime="application/pdf",
+                        key="download_player_report"
+                    )
