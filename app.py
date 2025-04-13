@@ -595,7 +595,7 @@ elif st.session_state.active_tab == "Physical fitness":
         selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_fitness")
         readiness_df = readiness_df[readiness_df["season"] == selected_season]
  
-        # Affichage des statistiques de readiness
+        # Displaying readiness statistics
         readiness_summary = readiness_df.groupby("date")["readiness_score"].mean().reset_index()
         import plotly.graph_objects as go
         
@@ -763,17 +763,17 @@ elif st.session_state.active_tab == "Load Demand":
     selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_load")
     player_data = player_data[player_data["season"] == selected_season]
 
-    # Scatter plot Distance avec moyenne et tendance mensuelle
+    # Scatter plot Distance with monthly average and trend
     if "distance" in player_data.columns:
         player_data = player_data[player_data["distance"] != 0]
         player_data_sorted = player_data.sort_values("date")
         avg_distance = player_data_sorted["distance"].mean()
         player_data_sorted["month"] = player_data_sorted["date"].dt.to_period("M").dt.to_timestamp()
 
-        # Moyenne par mois
+        # Average per month
         monthly_avg = player_data_sorted.groupby("month")["distance"].mean().reset_index()
 
-        # Scatter + moyenne globale
+        # Scatter + overall average
         fig_distance = go.Figure()
 
         fig_distance.add_trace(go.Scatter(
@@ -1028,13 +1028,13 @@ elif st.session_state.active_tab == "Recovery":
         avg_recovery = recent.groupby("player_id")["recovery_score"].mean().reset_index()
 
         if not avg_recovery.empty:
-            # Calculer le nombre de colonnes nécessaires
+            # Calculate the number of columns required
             n_players = len(avg_recovery)
-            cols = st.columns(min(n_players, 3))  # Maximum 3 cartes par ligne
+            cols = st.columns(min(n_players, 3))  # Maximum 3 cards per line
             
-            # Distribuer les cartes dans les colonnes
+            # Distribute the cards in the columns
             for idx, row in avg_recovery.iterrows():
-                with cols[idx % 3]:  # Utiliser le modulo pour cycler entre les colonnes
+                with cols[idx % 3]:  # Use modulo to cycle between columns
                     avg = row["recovery_score"]
                     player = row["player_id"]
                     color = "red" if avg < 60 else "orange" if avg < 75 else "green"
@@ -1048,7 +1048,7 @@ elif st.session_state.active_tab == "Recovery":
                                 "border-radius": "8px",
                                 "margin": "0.3rem",
                                 "font-family": "Poppins, sans-serif",
-                                "min-width": "100%",  # Assurer que la carte prend toute la largeur de la colonne
+                                "min-width": "100%",  # Ensure that the card takes up the full width of the column
                                 "height": "auto"
                             },
                             "title": {
