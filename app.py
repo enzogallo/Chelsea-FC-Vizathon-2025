@@ -1339,10 +1339,15 @@ elif st.session_state.active_tab == "Biography":
     existing = dev_data[dev_data["player_id"] == player_id].sort_values("last_update", ascending=False)
     with st.expander("➕ Add or Update Development Objective"):
         with st.form("add_dev_plan"):
-            long_term_goal = st.text_area("🎯 Long-Term Vision", value=existing["long_term_goal"].iloc[0] if not existing.empty else "")
-            dimensions = st.text_area("📌 Development Focus Areas (e.g. speed, positioning, leadership)", value=existing["dimensions"].iloc[0] if not existing.empty else "")
+            long_term_goal_val = existing["long_term_goal"].iloc[0] if not existing.empty else ""
+            dimensions_val = existing["dimensions"].iloc[0] if not existing.empty else ""
+            notes_val = existing["coach_notes"].iloc[0] if not existing.empty else ""
+
+            long_term_goal = st.text_area("🎯 Long-Term Vision", value="" if pd.isna(long_term_goal_val) else long_term_goal_val)
+            dimensions = st.text_area("📌 Development Focus Areas (e.g. speed, positioning, leadership)", value="" if pd.isna(dimensions_val) else dimensions_val)
+            notes = st.text_area("📝 Coach Notes", value="" if pd.isna(notes_val) else notes_val)
+
             status = st.selectbox("📈 Progress Status", ["Not Started", "In Progress", "On Hold", "Completed"], index=1)
-            notes = st.text_area("📝 Coach Notes", value=existing["coach_notes"].iloc[0] if not existing.empty else "")
             submitted = st.form_submit_button("💾 Save Plan")
             if submitted:
                 new_entry = {
