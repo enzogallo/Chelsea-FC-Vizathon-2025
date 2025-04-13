@@ -406,7 +406,7 @@ if not gps_data.empty and not recovery_data.empty:
             timeline_filtered_events = filtered_events[filtered_events["event_type"].isin(filtered_event_types)]
         else:
             timeline_filtered_events = filtered_events.copy()
-        # Analyse des événements pour résumé using timeline_filtered_events
+        # Analysis of events for summary using timeline_filtered_events
         stats_summary = timeline_filtered_events["event_type"].value_counts().to_dict()
         total_events = len(timeline_filtered_events)
         most_active_zone = "Left side" if timeline_filtered_events["x"].mean() < 52.5 else "Right side"
@@ -416,7 +416,7 @@ if not gps_data.empty and not recovery_data.empty:
         x_vals = np.random.normal(52.5, 20, 100)
         y_vals = np.random.normal(34, 15, 100)
         pitch.kdeplot(x_vals, y_vals, ax=ax, cmap="Reds", fill=True, levels=100, alpha=0.6)
-        # Supprimer l'ancien bloc colorbar s'il existe
+        # Remove previous colorbar block if exists
         
         # Nouveau bloc colorbar positionné en-dessous
         fig.subplots_adjust(top=0.85, bottom=0.12)
@@ -1324,7 +1324,7 @@ elif st.session_state.active_tab == "Biography":
 
     st.subheader("📇 Individual Development Plan (IDP)")
 
-    # Charger données existantes
+    # Load existing data
     dev_plan_path = "CFC Player Dev Plan.csv"
     if os.path.exists(dev_plan_path):
         dev_data = pd.read_csv(dev_plan_path)
@@ -1511,7 +1511,7 @@ elif st.session_state.active_tab == "External Factors":
 
     with st.expander("➕ Add External Note"):
         with st.form("external_note_form"):
-            note_date = st.date_input("📅 Date concerned", value=datetime.now())
+            note_date = st.date_input("📅 Relevant Date", value=datetime.now())
             player_options = ["Whole Team"] + [str(pid) for pid in sorted(gps_data["player_id"].dropna().unique())]
             selected_player = st.selectbox("👤 Player concerned", options=player_options, format_func=lambda x: x if x=="Whole Team" else id_to_name.get(int(x), "Unknown Player"))
             factor_type = st.selectbox("📌 Type of factor", ["Fatigue", "Travel", "Motivation", "Mental", "Weather", "Other"])
