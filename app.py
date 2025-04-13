@@ -1490,6 +1490,80 @@ elif st.session_state.active_tab == "Injury":
     else:
         st.info("No recovery or injury data available.")
 
+elif st.session_state.active_tab == "Sprint & High Intensity":
+    custom_header()
+    st.header("⚡ Sprint & High Intensity Zones")
+
+    st.markdown("""
+    This module summarizes high-intensity efforts per player based on accelerations and decelerations detected by GPS.
+    
+    - 📈 Helps identify explosive workloads
+    - 🧠 Useful for return-to-play or training adaptation
+    """)
+    st.caption("""
+    ### 📏 Interpreting Acceleration Values
+    - **> 2.0 m/s²**: Light acceleration (e.g. jogging bursts)
+    - **> 2.5 m/s²**: Moderate acceleration (standard game movements)
+    - **> 3.0 m/s²**: High acceleration (explosive efforts, pressing, sprints)
+    - **> 3.5 m/s²**: Very high intensity (sprint duels, fast counters)    
+    """)
+
+    accel_columns = list(sorted(set(
+        col for col in gps_data.columns if "accel_decel_over_" in col
+    )))
+
+    if not accel_columns:
+        st.warning("No acceleration data found in the GPS file.")
+    else:
+        def format_accel_label(col_name):
+            match = re.search(r"over_(\d+)_(\d+)", col_name)
+            if match:
+                return f"> {match.group(1)}.{match.group(2)} m/s²"
+            else:
+                return col_name
+        
+        selected_metric = st.selectbox("📊 Select intensity threshold", options=accel_columns, format_func=format_accel_label)
+
+        display_mode = st.selectbox("🧮 Display as", ["Total", "Average per session"])
+
+        gps_data["season"] = gps_data["date"].apply(get_season)
+        seasons_available = sorted(gps_data["season"].unique(), reverse=True)
+        selected_season = st.selectbox("📆 Select Season", seasons_available, key="season_filter_sprint")
+        gps_data = gps_data[gps_data["season"] == selected_season]
+
+        if display_mode == "Average per session":
+            session_level = gps_data.groupby(["player_id", "date"])[selected_metric].sum().reset_index()
+            summary = session_level.groupby("player_id")[selected_metric].mean().reset_index()
+        else:
+            summary = gps_data.groupby("player_id")[selected_metric].sum().reset_index()
+
+        summary["Player"] = summary["player_id"].map(PLAYER_NAMES)
+        summary = summary.sort_values(selected_metric, ascending=False)
+
+        fig_summary = px.bar(
+            summary,
+            x="Player",
+            y=selected_metric,
+            title=f"{'Average per Session' if display_mode == 'Average per session' else 'Total'} Accelerations/Decelerations Above Threshold",
+            labels={selected_metric: "Effort Count"},
+            text_auto=True
+        )
+        fig_summary.update_layout(height=500)
+        st.plotly_chart(fig_summary, use_container_width=True)
+
+        st.caption("""
+        High-intensity effort comparison:
+        - Higher bars indicate more explosive actions
+        - Compare players' workload at same intensity threshold
+        - Helps identify players who might need specific conditioning
+        """)
+
+        st.markdown("### 📘 Coach Insights")
+        st.markdown("""
+        - Players with higher effort counts were more involved in explosive actions.
+        - Use this metric to track conditioning or compare match/training impact.
+        - ⚠️ Very low counts might indicate reduced involvement or performance drop.
+        """)
     
 elif st.session_state.active_tab == "External Factors":
     custom_header()
