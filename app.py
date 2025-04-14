@@ -1619,29 +1619,38 @@ elif st.session_state.active_tab == "External Factors":
             submitted = st.form_submit_button("Save Note")
 
             if submitted and note_text.strip():
-                if "external_notes" not in st.session_state:
-                    st.session_state.external_notes = []
-                st.session_state.external_notes.append({
+                new_note = {
                     "date": note_date,
                     "player": selected_player,
                     "type": factor_type,
                     "note": note_text.strip()
-                })
+                }
+
+                file_path = "CFC External Factors Data.csv"
+                if os.path.exists(file_path):
+                    df = pd.read_csv(file_path)
+                else:
+                    df = pd.DataFrame(columns=["date", "player", "type", "note"])
+                df = pd.concat([df, pd.DataFrame([new_note])], ignore_index=True)
+                df.to_csv(file_path, index=False)
+
                 st.success("✅ Note saved!")
 
     # Display External Notes History
-    if "external_notes" in st.session_state and st.session_state.external_notes:
-        st.markdown("### 📝 Notes History")
-        for note in st.session_state.external_notes:
-            with st.container():
-                st.markdown(f"""
+    if os.path.exists("CFC External Factors Data.csv"):
+        notes_df = pd.read_csv("CFC External Factors Data.csv", parse_dates=["date"])
+        if not notes_df.empty:
+            notes_df = notes_df.sort_values("date", ascending=False)
+            for _, note in notes_df.iterrows():
+                with st.container():
+                    st.markdown(f"""
                         <div style="border: 1px solid #ccc; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background-color: #012d5e; color: white;">
-                        <h4 style="margin-bottom: 0.5rem;">📅 {note['date'].strftime('%Y-%m-%d')}</h4>
-                        <strong>👤 Player:</strong> {note['player'] if note['player']=="Whole Team" else PLAYER_NAMES.get(int(note['player']), note['player'])}
-                        <p><strong>📌 Type:</strong> {note['type']}</p>
-                        <p><strong>📝 Note:</strong> {note['note']}</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                            <h4 style="margin-bottom: 0.5rem;">📅 {note['date'].strftime('%Y-%m-%d')}</h4>
+                            <strong>👤 Player:</strong> {note['player'] if note['player']=="Whole Team" else PLAYER_NAMES.get(int(note['player']), note['player'])}
+                            <p><strong>📌 Type:</strong> {note['type']}</p>
+                            <p><strong>📝 Note:</strong> {note['note']}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
     else:
         st.info("No external notes recorded yet.")
     
