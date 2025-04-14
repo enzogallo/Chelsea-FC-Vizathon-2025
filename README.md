@@ -44,7 +44,7 @@ The dashboard is organized into the following modules (tabs):
 | Module                          | Description |
 |----------------------------------|-------------|
 | **Home**                         | Quick navigation and module overview |
-| **Squad Overview**               | Daily readiness score for all players (based on distance + recovery) |
+| **Physical fitness**             | Daily readiness score for all players (based on distance + recovery) |
 | **Load Demand**                  | Monitor physical load (distance, accel/decel, opposition) |
 | **Recovery**                     | Weekly and individual recovery trends + subjective scores |
 | **Sprint & High Intensity Zones** | Total explosive actions (>2.5 m/s²) per player |
@@ -73,9 +73,9 @@ All data used in this demo is **simulated or anonymized**, including:
 - ⚡ **High-Intensity Zone Mapping**
 - 📊 **Match Event Heatmaps & Replay Timelines**
 - 🧾 **Auto-generated PDF Reports per Player**
-- 🧍‍♂️ **Player Development Plans** (editable & tracked over time)
-- 🧠 **Smart Color Zones** (traffic light system for thresholds)
-- 🌍 **External factor logging** for holistic decision-making
+- 🧍‍♂️ **Player Development Plans** 
+- 🧠 **Smart Color Zones** 
+- 🌍 **External factor logging**
 
 ---
 
@@ -85,7 +85,6 @@ All data used in this demo is **simulated or anonymized**, including:
 - **Authentication system** for multiple coaches
 - Real-time match event streaming
 - Integrate **computer vision** module for sprint direction mapping
-- Dashboard packaging as **SaaS** for professional clubs
 
 ---
 
