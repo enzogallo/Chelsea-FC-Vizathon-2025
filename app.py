@@ -1628,6 +1628,22 @@ elif st.session_state.active_tab == "External Factors":
                     "note": note_text.strip()
                 })
                 st.success("✅ Note saved!")
+
+    # Display External Notes History
+    if "external_notes" in st.session_state and st.session_state.external_notes:
+        st.markdown("### 📝 Notes History")
+        for note in st.session_state.external_notes:
+            with st.container():
+                st.markdown(f"""
+                        <div style="border: 1px solid #ccc; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background-color: #012d5e; color: white;">
+                        <h4 style="margin-bottom: 0.5rem;">📅 {note['date'].strftime('%Y-%m-%d')}</h4>
+                        <strong>👤 Player:</strong> {note['player'] if note['player']=="Whole Team" else PLAYER_NAMES.get(int(note['player']), note['player'])}
+                        <p><strong>📌 Type:</strong> {note['type']}</p>
+                        <p><strong>📝 Note:</strong> {note['note']}</p>
+                    </div>
+                """, unsafe_allow_html=True)
+    else:
+        st.info("No external notes recorded yet.")
     
 elif st.session_state.active_tab == "Match Analysis":
     custom_header()
